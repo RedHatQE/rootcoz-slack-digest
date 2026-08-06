@@ -13,7 +13,7 @@ data:
     sort_by = "not_reviewed"
     tiers = ["gating", "release-checklist", "other"]
     teams = []
-    rootcause_summary_url = "https://rootcause-summary.example.com/rootcause_summary.html"
+    rootcause_summary_url = "https://example.html"
 
     [slack]
     mode = "bot"
