@@ -8,7 +8,6 @@ sort_by = "not_reviewed" # not_reviewed | failures | job_name
 tiers = ["gating", "release-checklist", "other"]
 # Empty teams = no team filter (all jobs matching tiers/window).
 teams = []
-rootcause_summary_url = "https://rootcause-summary.example.com/rootcause_summary.html"
 
 [rootcoz]
 # Prefer env: ROOTCOZ_URL, ROOTCOZ_USERNAME, ROOTCOZ_API_KEY, ROOTCOZ_VERIFY_SSL
