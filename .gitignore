@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+
+# Tools
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Local config / secrets
+config/config.toml
+.env
+*.pem
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Pi / agent
+.pi/tmp/
