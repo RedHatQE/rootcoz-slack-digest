@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rootcoz-slack-digest-config
+  namespace: cnv-rootcoz
+  labels:
+    app: rootcoz-slack-digest
+data:
+  config.toml: |
+    [digest]
+    timezone = "UTC"
+    max_rows = 25
+    sort_by = "not_reviewed"
+    tiers = ["gating", "release-checklist", "other"]
+    teams = []
+    rootcause_summary_url = "https://rootcause-summary-cnv-rootcoz.apps.cnv2.engineering.redhat.com/rootcause_summary.html"
+
+    [slack]
+    mode = "bot"
+
+    [mentions.teams]
+    # virt-node = "virt-node-qe"
+    # network = "network-qe"

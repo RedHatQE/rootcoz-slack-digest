@@ -1,0 +1,34 @@
+# Copy to config.toml (gitignored) or mount as ConfigMap in-cluster.
+# Secrets (ROOTCOZ_*, SLACK_*) should come from the environment / K8s Secret.
+
+[digest]
+timezone = "UTC"
+max_rows = 25
+sort_by = "not_reviewed" # not_reviewed | failures | job_name
+tiers = ["gating", "release-checklist", "other"]
+# Empty teams = no team filter (all jobs matching tiers/window).
+teams = []
+rootcause_summary_url = "https://rootcause-summary-cnv-rootcoz.apps.cnv2.engineering.redhat.com/rootcause_summary.html"
+
+[rootcoz]
+# Prefer env: ROOTCOZ_URL, ROOTCOZ_USERNAME, ROOTCOZ_API_KEY, ROOTCOZ_VERIFY_SSL
+url = ""
+username = ""
+api_key = ""
+verify_ssl = true
+
+[slack]
+# Prefer bot mode for usergroup mentions (<!subteam^ID>).
+# mode = "bot" | "webhook"
+mode = "bot"
+# Prefer env: SLACK_BOT_TOKEN, SLACK_CHANNEL, SLACK_WEBHOOK_URL
+bot_token = ""
+channel = ""
+webhook_url = ""
+
+# Team key → Slack usergroup handle (without @).
+# Teams manage membership in Slack; this map rarely changes.
+[mentions.teams]
+# virt-node = "virt-node-qe"
+# network = "network-qe"
+# storage-platform = "storage-platform-qe"
