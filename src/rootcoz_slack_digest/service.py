@@ -149,7 +149,11 @@ def run_digest(
         own_rootcoz = rootcoz_client is None
         client = rootcoz_client or RootcozClient(cfg.rootcoz)
         try:
-            rows = client.fetch_job_rows(window)
+            rows = client.fetch_job_rows(
+                window,
+                exclude_tags=cfg.digest.exclude_tags or None,
+                exclude_labels=cfg.digest.exclude_labels or None,
+            )
         finally:
             if own_rootcoz:
                 client.close()

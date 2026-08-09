@@ -104,6 +104,8 @@ class DigestConfig(BaseModel):
     sort_by: SortBy = SortBy.NOT_REVIEWED
     tiers: list[str] = Field(default_factory=lambda: ["gating", "release-checklist", "other"])
     columns: list[DigestColumn] = Field(default_factory=lambda: list(DEFAULT_COLUMNS))
+    exclude_tags: list[str] = Field(default_factory=list)
+    exclude_labels: list[str] = Field(default_factory=list)
 
     @field_validator("columns", mode="before")
     @classmethod

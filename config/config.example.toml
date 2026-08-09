@@ -15,6 +15,10 @@ tiers = ["gating", "release-checklist", "other"]
 # Column order controls the Slack table (API fields only).
 columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
 # Optional columns: team, not_reviewed, build
+# Exclude jobs whose tags or metadata.labels contain these substrings.
+# Example: exclude_tags = ["s390x"] filters out s390x architecture jobs.
+exclude_tags = []
+exclude_labels = []
 
 [message]
 format = "blocks" # blocks | mrkdwn | plain

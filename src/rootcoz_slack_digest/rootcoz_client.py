@@ -48,7 +48,13 @@ class RootcozClient:
     def __exit__(self, *args: object) -> None:
         self.close()
 
-    def fetch_job_rows(self, window: WeekWindow) -> list[JobRow]:
+    def fetch_job_rows(
+        self,
+        window: WeekWindow,
+        *,
+        exclude_tags: list[str] | None = None,
+        exclude_labels: list[str] | None = None,
+    ) -> list[JobRow]:
         """Fetch jobs using configured endpoint, params, and field mapping."""
         fm = self._config.field_map
         params = dict(self._config.params)
@@ -96,6 +102,17 @@ class RootcozClient:
                 rootcoz_url = resolve_template(fm.rootcoz, resolved_fields, config_vars)
             else:
                 rootcoz_url = str(resolve_path(job, fm.rootcoz) or "")
+
+            metadata = job.get("metadata") if isinstance(job.get("metadata"), dict) else {}
+            job_tags = [str(t) for t in (job.get("tags") or [])]
+            job_labels = [str(lb) for lb in (metadata.get("labels") or [])]
+
+            if exclude_tags and any(pat in tag for pat in exclude_tags for tag in job_tags):
+                continue
+            if exclude_labels and any(
+                pat in label for pat in exclude_labels for label in job_labels
+            ):
+                continue
 
             rows.append(
                 JobRow(

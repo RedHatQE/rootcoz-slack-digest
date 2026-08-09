@@ -57,7 +57,7 @@ def _column_value(row: JobRow, column: DigestColumn, *, mrkdwn: bool) -> str:
 
 _COLUMN_HEADERS: dict[DigestColumn, str] = {
     DigestColumn.JOB_NAME: "Job",
-    DigestColumn.TIER: "Tier",
+    DigestColumn.TIER: "Lane",
     DigestColumn.TEAM: "Team",
     DigestColumn.FAILURES: "Fail",
     DigestColumn.REVIEWED: "Rev",
@@ -181,7 +181,30 @@ def _safe_format(template: str, template_name: str, **kwargs: object) -> str:
 def _split_blocks(
     text: str, block_type: str = "section", max_chars: int = 2900
 ) -> list[dict[str, object]]:
-    """Split long text into multiple Slack blocks to stay under the 3000-char limit."""
+    """Split long text into multiple Slack blocks, preserving code fences."""
+    if len(text) <= max_chars:
+        return [{"type": block_type, "text": {"type": "mrkdwn", "text": text}}]
+
+    # Try to split at code fence boundary first
+    fence_end = text.find("\n```\n")
+    if fence_end == -1:
+        fence_end = text.find("\n```")
+
+    if fence_end != -1:
+        # Split into: code fence part + rest
+        fence_part = text[: fence_end + 4]  # include the closing ```
+        rest = text[fence_end + 4 :].strip()
+
+        blocks = _split_by_lines(fence_part, block_type, max_chars)
+        if rest:
+            blocks.extend(_split_by_lines(rest, block_type, max_chars))
+        return blocks
+
+    return _split_by_lines(text, block_type, max_chars)
+
+
+def _split_by_lines(text: str, block_type: str, max_chars: int) -> list[dict[str, object]]:
+    """Split text by line boundaries."""
     if len(text) <= max_chars:
         return [{"type": block_type, "text": {"type": "mrkdwn", "text": text}}]
 
@@ -191,7 +214,7 @@ def _split_blocks(
     chunk_len = 0
 
     for line in lines:
-        line_len = len(line) + 1  # +1 for newline
+        line_len = len(line) + 1
         if chunk and chunk_len + line_len > max_chars:
             blocks.append(
                 {
