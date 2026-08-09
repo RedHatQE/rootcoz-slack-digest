@@ -90,3 +90,33 @@ def test_plain_format_is_string() -> None:
     )
     assert isinstance(payload, str)
     assert "HTML" not in payload
+
+
+def test_build_message_splits_long_body() -> None:
+    """Body over 2900 chars becomes multiple section blocks under the limit."""
+    window = week_from_dates(date(2026, 7, 27), date(2026, 8, 2))
+    rows = [_row(f"very-long-job-name-{i:03d}-padding-xxxxxxxx", 2, 0) for i in range(40)]
+    payload = build_message(
+        window=window,
+        rows=rows,
+        max_rows=40,
+        sort_by=SortBy.JOB_NAME,
+        columns=[
+            DigestColumn.JOB_NAME,
+            DigestColumn.TIER,
+            DigestColumn.FAILURES,
+            DigestColumn.REVIEWED,
+            DigestColumn.JENKINS,
+            DigestColumn.ROOTCOZ,
+        ],
+        message=MessageConfig(format=MessageFormat.BLOCKS),
+    )
+    assert isinstance(payload, list)
+    types = [b.get("type") for b in payload]
+    divider_idx = types.index("divider")
+    body_sections = [b for b in payload[divider_idx + 1 :] if b.get("type") == "section"]
+    assert len(body_sections) > 1
+    for section in body_sections:
+        text = section["text"]["text"]
+        assert isinstance(text, str)
+        assert len(text) <= 2900

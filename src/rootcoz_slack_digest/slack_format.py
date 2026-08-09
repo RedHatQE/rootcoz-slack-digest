@@ -178,6 +178,43 @@ def _safe_format(template: str, template_name: str, **kwargs: object) -> str:
         raise ValueError(msg) from exc
 
 
+def _split_blocks(
+    text: str, block_type: str = "section", max_chars: int = 2900
+) -> list[dict[str, object]]:
+    """Split long text into multiple Slack blocks to stay under the 3000-char limit."""
+    if len(text) <= max_chars:
+        return [{"type": block_type, "text": {"type": "mrkdwn", "text": text}}]
+
+    blocks: list[dict[str, object]] = []
+    lines = text.split("\n")
+    chunk: list[str] = []
+    chunk_len = 0
+
+    for line in lines:
+        line_len = len(line) + 1  # +1 for newline
+        if chunk and chunk_len + line_len > max_chars:
+            blocks.append(
+                {
+                    "type": block_type,
+                    "text": {"type": "mrkdwn", "text": "\n".join(chunk)},
+                }
+            )
+            chunk = []
+            chunk_len = 0
+        chunk.append(line)
+        chunk_len += line_len
+
+    if chunk:
+        blocks.append(
+            {
+                "type": block_type,
+                "text": {"type": "mrkdwn", "text": "\n".join(chunk)},
+            }
+        )
+
+    return blocks
+
+
 def build_message(
     *,
     window: WeekWindow,
@@ -230,7 +267,7 @@ def build_message(
             {"type": "section", "text": {"type": "mrkdwn", "text": header}},
             {"type": "section", "text": {"type": "mrkdwn", "text": totals}},
             {"type": "divider"},
-            {"type": "section", "text": {"type": "mrkdwn", "text": body}},
+            *_split_blocks(body),
         ]
         if omitted_text:
             blocks.append(
