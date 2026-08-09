@@ -7,17 +7,31 @@ metadata:
     app: rootcoz-slack-digest
 data:
   config.toml: |
-    [digest]
+    [schedule]
+    cron = "0 7 * * 0"
     timezone = "UTC"
+
+    [digest]
     max_rows = 25
     sort_by = "not_reviewed"
     tiers = ["gating", "release-checklist", "other"]
     teams = []
-    rootcause_summary_url = "https://example.html"
+    columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
+
+    [message]
+    format = "blocks"
+    include_mentions = true
+    header_template = "*rootcoz weekly digest* — {week_label}{mention_suffix}"
+    totals_template = "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}*"
+    omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
+    table_code_fence = true
 
     [slack]
     mode = "bot"
-
-    [mentions.teams]
-    # virt-node = "virt-node-qe"
-    # network = "network-qe"
+  ROOTCOZ_URL: "REPLACE"
+  ROOTCOZ_VERIFY_SSL: "true"
+  SLACK_TARGETS: |
+    [
+      {"team": "virt-node", "channel": "REPLACE", "usergroup": "virt-node-qe"},
+      {"team": "network", "channel": "REPLACE", "usergroup": "network-qe"}
+    ]

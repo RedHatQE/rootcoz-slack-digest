@@ -10,7 +10,7 @@ from typing import Annotated
 import typer
 
 from rootcoz_slack_digest.models import load_config
-from rootcoz_slack_digest.service import render_blocks_json, run_digest
+from rootcoz_slack_digest.service import render_payload, run_digest
 
 app = typer.Typer(
     name="rootcoz-slack-digest",
@@ -54,11 +54,25 @@ def run_cmd(
     dt = date.fromisoformat(date_to) if date_to else None
     if (df is None) ^ (dt is None):
         raise typer.BadParameter("Provide both --from and --to, or neither")
+    typer.echo(
+        f"schedule.cron={cfg.schedule.cron!r} timezone={cfg.schedule.timezone!r}",
+        err=True,
+    )
     result = run_digest(cfg, dry_run=dry_run, date_from=df, date_to=dt)
     if dry_run:
-        typer.echo(render_blocks_json(result.blocks))
+        if not result.target_results:
+            typer.echo("(no matching targets to render)")
+            return
+        for tr in result.target_results:
+            typer.echo(f"# team={tr.target.team} channel={tr.target.channel}")
+            typer.echo(render_payload(tr.payload))
     else:
-        typer.echo(f"Posted digest ({len(result.rows)} jobs).")
+        if result.posted:
+            n_jobs = len(result.all_rows)
+            n_targets = len(result.target_results)
+            typer.echo(f"Posted digest ({n_jobs} jobs, {n_targets} targets).")
+        else:
+            typer.echo("No failures in window — nothing posted.")
 
 
 @app.command("render")
@@ -77,7 +91,7 @@ def render_cmd(
     ] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
 ) -> None:
-    """Same as ``run --dry-run`` (stdout Block Kit JSON)."""
+    """Same as ``run --dry-run`` (stdout payload per target)."""
     run_cmd(
         config=config,
         dry_run=True,
