@@ -1,4 +1,4 @@
-"""Tests for digest orchestration (offline rows)."""
+"""Tests for digest orchestration (offline rows / API-shaped data)."""
 
 from datetime import date
 
@@ -32,5 +32,18 @@ def test_run_digest_dry_run_with_injected_rows() -> None:
     )
     assert result.posted is False
     assert len(result.rows) == 1
-    header = result.blocks[0]["text"]["text"]  # type: ignore[index]
-    assert "<!subteam^S42>" in header
+    blob = str(result.payload)
+    assert "<!subteam^S42>" in blob
+    assert "rootcause-summary" not in blob
+    assert "HTML summary" not in blob
+
+
+def test_load_example_has_no_html_summary_url() -> None:
+    from pathlib import Path
+
+    from rootcoz_slack_digest.models import load_config
+
+    cfg = load_config(Path(__file__).resolve().parents[1] / "config" / "config.example.toml")
+    assert "rootcause_summary_url" not in type(cfg.digest).model_fields
+    assert cfg.schedule.cron == "0 7 * * 0"
+    assert "job_name" in [c.value for c in cfg.digest.columns]

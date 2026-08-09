@@ -2,31 +2,39 @@
 
 ## Goal
 
-Every Sunday, post a Slack message summarizing the last complete Mon–Sun week of
-rootcoz analysis for CNV QE: job name, tier, failures, reviewed, Jenkins link,
-rootcoz link.
+On a configurable Cron schedule, query the **rootcoz API** for the last complete
+Mon–Sun week and post a Slack message (job, tier, failures, reviewed, links).
 
 ## Boundaries
 
 | In scope | Out of scope |
 |----------|--------------|
-| Slack digest + OpenShift CronJob | HTML reports (`rootcause-summary`) |
-| rootcoz API consumer | Changing rootcoz analysis/review |
+| Slack digest from rootcoz API | HTML reports (`rootcause-summary` / coverage) |
+| Configurable columns / message templates | Changing rootcoz analysis/review |
 | Team usergroup mentions | Maintaining individual people lists |
+
+## Data path (mandatory)
+
+```text
+login → GET /api/reports/totals (+ metadata) → format message → Slack
+```
+
+No HTML summary URLs. If the API returns nothing useful, the message says so.
+
+## Configurability
+
+| Area | Config |
+|------|--------|
+| Cron | `[schedule] cron` (keep `deploy/cronjob.yaml` in sync) |
+| Columns | `[digest] columns` ordered list |
+| Message | `[message] format` + templates |
 
 ## Mentions
 
-Config maps `team → Slack usergroup handle`. Membership is managed in Slack by
-each team. Runtime resolves handle → `<!subteam^ID>` via `usergroups.list`
-(requires bot token + `usergroups:read`).
-
-## Data
-
-- Window: last complete Mon–Sun UTC (`week.last_complete_week`)
-- API: `GET /api/reports/totals?from=&to=&status=completed&tier=&team=`
-- Links: rootcoz `/results/{job_id}`; Jenkins from env `JENKINS_URL` + job/build
+`[mentions.teams]` maps team → Slack usergroup handle. Membership is managed in
+Slack. Runtime resolves handle → `<!subteam^ID>` (`usergroups:read` + bot token).
 
 ## Deploy
 
 Namespace `REPLACE_NAMESPACE`. Secret for credentials; ConfigMap for `config.toml`;
-CronJob `0 7 * * 0`.
+CronJob schedule must match `[schedule].cron`.

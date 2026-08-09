@@ -10,7 +10,7 @@ from typing import Annotated
 import typer
 
 from rootcoz_slack_digest.models import load_config
-from rootcoz_slack_digest.service import render_blocks_json, run_digest
+from rootcoz_slack_digest.service import render_payload, run_digest
 
 app = typer.Typer(
     name="rootcoz-slack-digest",
@@ -54,11 +54,15 @@ def run_cmd(
     dt = date.fromisoformat(date_to) if date_to else None
     if (df is None) ^ (dt is None):
         raise typer.BadParameter("Provide both --from and --to, or neither")
+    typer.echo(
+        f"schedule.cron={cfg.schedule.cron!r} timezone={cfg.schedule.timezone!r}",
+        err=True,
+    )
     result = run_digest(cfg, dry_run=dry_run, date_from=df, date_to=dt)
     if dry_run:
-        typer.echo(render_blocks_json(result.blocks))
+        typer.echo(render_payload(result.payload))
     else:
-        typer.echo(f"Posted digest ({len(result.rows)} jobs).")
+        typer.echo(f"Posted digest ({len(result.rows)} jobs from rootcoz API).")
 
 
 @app.command("render")

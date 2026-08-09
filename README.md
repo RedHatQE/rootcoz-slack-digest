@@ -1,11 +1,15 @@
 # rootcoz-slack-digest
 
-Weekly Slack digest of [rootcoz](https://github.com/myk-org/rootcoz) failures and
-review progress for CNV QE teams.
+Slack digest of [rootcoz](https://github.com/myk-org/rootcoz) failures and review
+progress for CNV QE teams.
 
-Posts a table (job, tier, failures, reviewed, Jenkins + rootcoz links) for the
-last complete Monday–Sunday week. Teams are CC'd via **Slack usergroups** they
-manage themselves.
+**Data source:** rootcoz HTTP API only (`/api/reports/totals` + job metadata).
+This tool does **not** use or link to HTML coverage/rootcause summary pages.
+
+On a configurable schedule (or on demand via CLI), it queries rootcoz for a date
+window (default: last complete Mon–Sun), formats a configurable table (job, tier,
+failures, reviewed, Jenkins + rootcoz links), and posts to Slack. Teams are CC'd
+via **Slack usergroups** they manage themselves.
 
 ## Quick start
 
@@ -22,12 +26,28 @@ uv run rootcoz-slack-digest run --config config/config.toml --dry-run
 
 | Command | Description |
 |---------|-------------|
-| `rootcoz-slack-digest run` | Fetch week + post (or `--dry-run`) |
-| `rootcoz-slack-digest render` | Alias for dry-run JSON to stdout |
+| `rootcoz-slack-digest run` | Query API + post (or `--dry-run`) |
+| `rootcoz-slack-digest render` | Alias for dry-run payload to stdout |
 
 Flags (`--config`, `--from`, `--to`, `--dry-run`, `--verbose`) also have
-equivalents in `config.toml` under `[digest]`, `[rootcoz]`, `[slack]`,
-`[mentions.teams]`.
+equivalents in `config.toml`.
+
+## Configuration highlights
+
+```toml
+[schedule]
+cron = "0 7 * * 0"          # any cron; keep deploy/cronjob.yaml in sync
+
+[digest]
+columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
+
+[message]
+format = "blocks"           # blocks | mrkdwn | plain
+header_template = "*rootcoz digest* — {week_label}{mention_suffix}"
+```
+
+See `config/config.example.toml` for all keys (columns, message templates, tiers,
+teams, mentions).
 
 ## Mentions (no people lists in git)
 
@@ -36,22 +56,16 @@ equivalents in `config.toml` under `[digest]`, `[rootcoz]`, `[slack]`,
 network = "network-qe"
 ```
 
-Membership of `@network-qe` is edited in Slack by that team. This repo only
-stores the stable handle map.
-
 Requires Slack bot scopes: `chat:write`, `usergroups:read`.
 
 ## Deploy (OpenShift)
 
 Manifests under `deploy/` target namespace `REPLACE_NAMESPACE`:
 
-1. Create Secret `rootcoz-slack-digest-credentials` (includes `GITHUB_TOKEN` so the
-   CronJob can `pip install` this private repo)
-2. Apply ConfigMap + CronJob (`0 7 * * 0` Sunday 07:00 UTC)
+1. Create Secret `rootcoz-slack-digest-credentials`
+2. Apply ConfigMap + CronJob — set `spec.schedule` to the same value as
+   `[schedule].cron`
 3. Manual test: `oc create job --from=cronjob/rootcoz-slack-digest manual-$(date +%s) -n REPLACE_NAMESPACE`
-
-Does **not** replace the HTML rootcause summary at
-`rootcause-summary-REPLACE_NAMESPACE`.
 
 ## Development
 

@@ -3,6 +3,7 @@
 ## What this is
 
 Private REPLACE_ORG tool: weekly Slack digest of rootcoz failures/reviews for CNV QE.
+Always query the **rootcoz API** before posting. Never depend on HTML summary URLs.
 
 ## Layout
 

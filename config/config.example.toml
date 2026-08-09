@@ -1,13 +1,30 @@
 # Copy to config.toml (gitignored) or mount as ConfigMap in-cluster.
-# Secrets (ROOTCOZ_*, SLACK_*) should come from the environment / K8s Secret.
+# Secrets (ROOTCOZ_*, SLACK_*) come from the environment / K8s Secret.
+# Message data is always loaded from the rootcoz API — no HTML report URLs.
+
+[schedule]
+# Keep deploy/cronjob.yaml spec.schedule in sync with this value.
+cron = "0 7 * * 0"
+timezone = "UTC"
 
 [digest]
-timezone = "UTC"
 max_rows = 25
 sort_by = "not_reviewed" # not_reviewed | failures | job_name
 tiers = ["gating", "release-checklist", "other"]
 # Empty teams = no team filter (all jobs matching tiers/window).
 teams = []
+# Column order controls the Slack table (API fields only).
+columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
+# Optional columns: team, not_reviewed, build
+
+[message]
+format = "blocks" # blocks | mrkdwn | plain
+include_mentions = true
+header_template = "*rootcoz weekly digest* — {week_label}{mention_suffix}"
+totals_template = "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}*"
+row_template = "• *{job_name}* ({tier}) — fail {failures} / rev {reviewed}{jenkins_part}{rootcoz_part}"
+omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
+table_code_fence = true
 
 [rootcoz]
 # Prefer env: ROOTCOZ_URL, ROOTCOZ_USERNAME, ROOTCOZ_API_KEY, ROOTCOZ_VERIFY_SSL
@@ -18,7 +35,6 @@ verify_ssl = true
 
 [slack]
 # Prefer bot mode for usergroup mentions (<!subteam^ID>).
-# mode = "bot" | "webhook"
 mode = "bot"
 # Prefer env: SLACK_BOT_TOKEN, SLACK_CHANNEL, SLACK_WEBHOOK_URL
 bot_token = ""

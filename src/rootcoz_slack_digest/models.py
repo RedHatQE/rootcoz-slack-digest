@@ -19,6 +19,38 @@ class SortBy(StrEnum):
     JOB_NAME = "job_name"
 
 
+class DigestColumn(StrEnum):
+    """Allowed Slack message columns (order comes from config list)."""
+
+    JOB_NAME = "job_name"
+    TIER = "tier"
+    TEAM = "team"
+    FAILURES = "failures"
+    REVIEWED = "reviewed"
+    NOT_REVIEWED = "not_reviewed"
+    JENKINS = "jenkins"
+    ROOTCOZ = "rootcoz"
+    BUILD = "build"
+
+
+class MessageFormat(StrEnum):
+    """How the digest is rendered for Slack."""
+
+    BLOCKS = "blocks"
+    MRKDWN = "mrkdwn"
+    PLAIN = "plain"
+
+
+DEFAULT_COLUMNS: list[DigestColumn] = [
+    DigestColumn.JOB_NAME,
+    DigestColumn.TIER,
+    DigestColumn.FAILURES,
+    DigestColumn.REVIEWED,
+    DigestColumn.JENKINS,
+    DigestColumn.ROOTCOZ,
+]
+
+
 class WeekWindow(BaseModel):
     """Inclusive Mon–Sun UTC week window."""
 
@@ -44,6 +76,7 @@ class JobRow(BaseModel):
     team: str = ""
     failure_count: int = 0
     reviewed_count: int = 0
+    build_number: int | None = None
     jenkins_url: str = ""
     rootcoz_url: str = ""
 
@@ -53,20 +86,50 @@ class JobRow(BaseModel):
         return max(self.failure_count - self.reviewed_count, 0)
 
 
+class ScheduleConfig(BaseModel):
+    """When the digest should run (CronJob must match ``cron``)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    cron: str = "0 7 * * 0"
+    timezone: str = "UTC"
+
+
 class DigestConfig(BaseModel):
     """Digest behaviour from config.toml ``[digest]``."""
 
     model_config = ConfigDict(frozen=True)
 
-    timezone: str = "UTC"
     max_rows: int = 25
     sort_by: SortBy = SortBy.NOT_REVIEWED
     tiers: list[str] = Field(default_factory=lambda: ["gating", "release-checklist", "other"])
     teams: list[str] = Field(default_factory=list)
-    rootcause_summary_url: str = (
-        "https://rootcause-summary.example.com/"
-        "rootcause_summary.html"
+    columns: list[DigestColumn] = Field(default_factory=lambda: list(DEFAULT_COLUMNS))
+
+    @field_validator("columns", mode="before")
+    @classmethod
+    def _normalize_columns(cls, value: Any) -> Any:
+        if value is None or value == []:
+            return list(DEFAULT_COLUMNS)
+        return value
+
+
+class MessageConfig(BaseModel):
+    """Slack message layout templates (API data only — no external HTML reports)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    format: MessageFormat = MessageFormat.BLOCKS
+    include_mentions: bool = True
+    header_template: str = "*rootcoz weekly digest* — {week_label}{mention_suffix}"
+    totals_template: str = (
+        "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}*"
     )
+    row_template: str = (
+        "• *{job_name}* ({tier}) — fail {failures} / rev {reviewed}{jenkins_part}{rootcoz_part}"
+    )
+    omitted_template: str = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
+    table_code_fence: bool = True
 
 
 class RootcozConfig(BaseModel):
@@ -111,7 +174,9 @@ class AppConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    schedule: ScheduleConfig = Field(default_factory=ScheduleConfig)
     digest: DigestConfig = Field(default_factory=DigestConfig)
+    message: MessageConfig = Field(default_factory=MessageConfig)
     rootcoz: RootcozConfig = Field(default_factory=RootcozConfig)
     slack: SlackConfig = Field(default_factory=SlackConfig)
     mentions: MentionsConfig = Field(default_factory=MentionsConfig)
