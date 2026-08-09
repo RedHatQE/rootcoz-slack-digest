@@ -22,13 +22,12 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: digest
-              image: python:3.12-slim
+              image: registry.access.redhat.com/ubi9/python-314:latest
               command: ["bash", "-c"]
               args:
                 - |
                   set -euo pipefail
                   export HOME=/tmp
-                  dnf install -y -q git
                   pip install --quiet --target=/tmp/pylibs \
                     "rootcoz-slack-digest @ git+https://github.com/REPLACE_ORG/rootcoz-slack-digest.git@${DIGEST_REPO_REF}"
                   PYTHONPATH=/tmp/pylibs PATH="/tmp/pylibs/bin:$PATH" \
