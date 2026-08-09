@@ -13,7 +13,14 @@ from rootcoz_slack_digest.slack_format import build_message, sort_rows
 from rootcoz_slack_digest.week import week_from_dates
 
 
-def _row(name: str, failures: int, reviewed: int, *, tier: str = "gating") -> JobRow:
+def _row(
+    name: str,
+    failures: int,
+    reviewed: int,
+    *,
+    tier: str = "gating",
+    version: str = "",
+) -> JobRow:
     return JobRow(
         job_id=name,
         job_name=name,
@@ -22,6 +29,7 @@ def _row(name: str, failures: int, reviewed: int, *, tier: str = "gating") -> Jo
         reviewed_count=reviewed,
         jenkins_url=f"https://jenkins.example/job/{name}/1/",
         rootcoz_url=f"https://rootcoz.example/results/{name}",
+        version=version,
     )
 
 
@@ -114,6 +122,30 @@ def test_grouped_by_tier_order_and_links() -> None:
     assert payload.index("gate-high") < payload.index("gate-low")
     assert "<https://jenkins.example/job/gate-high/1/|gate-high>" in payload
     assert "fail 23 / rev 0 · <https://rootcoz.example/results/gate-high|rootcoz>" in payload
+
+
+def test_grouped_by_tier_sorts_by_version_then_failures() -> None:
+    window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
+    rows = [
+        _row("job-4.22-high", 14, 0, version="4.22"),
+        _row("job-5.0", 3, 0, version="5.0"),
+        _row("job-4.22-low", 1, 0, version="4.22"),
+        _row("job-4.23", 1, 0, version="4.23"),
+    ]
+    payload = build_message(
+        window=window,
+        rows=rows,
+        max_rows=10,
+        sort_by=SortBy.JOB_NAME,
+        columns=list(DigestColumn),
+        message=MessageConfig(format=MessageFormat.MRKDWN),
+    )
+    assert isinstance(payload, str)
+    assert payload.index("job-5.0") < payload.index("job-4.23")
+    assert payload.index("job-4.23") < payload.index("job-4.22-high")
+    assert payload.index("job-4.22-high") < payload.index("job-4.22-low")
+    assert "(5.0) fail 3 / rev 0" in payload
+    assert "(4.22) fail 14 / rev 0" in payload
 
 
 def test_columns_omit_jenkins() -> None:

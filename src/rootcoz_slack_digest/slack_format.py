@@ -88,6 +88,7 @@ def _row_template_vars(row: JobRow) -> dict[str, str]:
         "rootcoz_part": f" · {rootcoz_link}" if rootcoz_link else "",
         "created_at": row.created_at,
         "date": row.created_at[:10] if row.created_at else "",
+        "version": row.version,
     }
 
 
@@ -121,11 +122,24 @@ def format_rows_text(
 _TIER_ORDER = {"gating": 0, "release-checklist": 1}
 
 
+def _version_sort_key(version: str) -> tuple[int, ...]:
+    """Parse version string into comparable tuple. E.g., '4.22' → (4, 22)."""
+    if not version:
+        return (0,)
+    parts: list[int] = []
+    for part in version.split("."):
+        try:
+            parts.append(int(part))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
+
+
 def _format_grouped_by_tier(rows: list[JobRow]) -> str:
     """Format rows grouped by tier with inline mrkdwn links.
 
     Order: gating → release-checklist → other tiers alphabetically.
-    Within each tier, sorted by failure_count descending.
+    Within each tier, sorted by version descending, then failure_count descending.
     """
     groups: dict[str, list[JobRow]] = {}
     for row in rows:
@@ -138,7 +152,11 @@ def _format_grouped_by_tier(rows: list[JobRow]) -> str:
 
     sections: list[str] = []
     for tier in sorted_tiers:
-        tier_rows = sorted(groups[tier], key=lambda r: -r.failure_count)
+        tier_rows = sorted(
+            groups[tier],
+            key=lambda r: (_version_sort_key(r.version), r.failure_count),
+            reverse=True,
+        )
         lines = [f"*{tier}*"]
         for row in tier_rows:
             if row.jenkins_url:
@@ -148,7 +166,8 @@ def _format_grouped_by_tier(rows: list[JobRow]) -> str:
 
             date_str = row.created_at[:10] if row.created_at else ""
             date_part = f" · {date_str}" if date_str else ""
-            stats = f"fail {row.failure_count} / rev {row.reviewed_count}{date_part}"
+            version_part = f"({row.version}) " if row.version else ""
+            stats = f"{version_part}fail {row.failure_count} / rev {row.reviewed_count}{date_part}"
             parts = [f"• {name_part} — {stats}"]
             if row.rootcoz_url:
                 parts.append(_link("rootcoz", row.rootcoz_url))

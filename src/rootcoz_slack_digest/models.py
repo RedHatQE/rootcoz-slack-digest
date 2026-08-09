@@ -80,6 +80,7 @@ class JobRow(BaseModel):
     jenkins_url: str = ""
     rootcoz_url: str = ""
     created_at: str = ""
+    version: str = ""
 
     @property
     def not_reviewed(self) -> int:
@@ -146,6 +147,7 @@ class FieldMapConfig(BaseModel):
     job_id: str = "job_id"
     job_name: str = "job_name"
     team: str = "metadata.team"
+    version: str = "metadata.version"
     tier: str = "metadata.labels"
     failures: str = "failure_count"
     reviewed: str = "reviewed_count"

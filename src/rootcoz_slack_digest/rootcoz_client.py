@@ -85,6 +85,7 @@ class RootcozClient:
             job_id = str(resolve_path(job, fm.job_id) or "")
             job_name = str(resolve_path(job, fm.job_name) or job_id)
             team_val = str(resolve_path(job, fm.team) or "")
+            version = str(resolve_path(job, fm.version) or "")
 
             tier_raw = resolve_path(job, fm.tier)
             tier = extract_tier(tier_raw, self._config.tier_labels.labels)
@@ -127,6 +128,7 @@ class RootcozClient:
                     jenkins_url=jenkins_url,
                     rootcoz_url=rootcoz_url,
                     created_at=created_at,
+                    version=version,
                 )
             )
         logger.info(
@@ -137,3 +139,36 @@ class RootcozClient:
             labels,
         )
         return rows
+
+    def count_all_jobs(
+        self,
+        window: WeekWindow,
+        *,
+        team: str = "",
+        labels: list[str] | None = None,
+        exclude_labels: list[str] | None = None,
+    ) -> int:
+        """Count all jobs (reviewed + unreviewed) for a team/label combo."""
+        params: list[tuple[str, str]] = []
+        # Use base params but WITHOUT review_status filter
+        for k, v in self._config.params.items():
+            if k != "review_status":
+                params.append((k, str(v)))
+        params.append(("date_from", window.date_from.isoformat()))
+        params.append(("date_to", window.date_to.isoformat()))
+        if team:
+            params.append(("team", team))
+        if labels:
+            for label in labels:
+                params.append(("label", label))
+        if exclude_labels:
+            for el in exclude_labels:
+                params.append(("exclude_label", el))
+
+        resp = self._client.get(self._config.endpoint, params=params)
+        resp.raise_for_status()
+        payload = resp.json()
+        if isinstance(payload, list):
+            return len(payload)
+        jobs = payload.get("jobs") or payload.get("results") or []
+        return len(jobs)

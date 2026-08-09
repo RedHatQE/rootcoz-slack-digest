@@ -72,10 +72,12 @@ def test_run_digest_celebrates_when_team_has_no_unreviewed_failures() -> None:
     assert len(result.target_results) == 1
     assert result.target_results[0].rows == []
     blob = str(result.payload)
-    assert "All clear for" in blob
-    assert "either no failures occurred or all have been reviewed" in blob
+    # Injected-rows mode skips count_all_jobs → treated as zero failures
+    assert "Zero" in blob
+    assert "failures for" in blob
     assert "*network*" in blob
     assert "<!subteam^S42>" in blob
+    assert "gating" in blob
 
 
 def test_load_example_has_no_html_summary_url() -> None:

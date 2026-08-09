@@ -205,17 +205,40 @@ def run_digest(
                 target.team,
             )
             if not target_rows:
-                # Team has no unreviewed failures — post celebration
+                # Check if there were failures that are all reviewed
+                total_jobs = 0
+                if rows is None:  # Only query API if not in test mode
+                    assert client is not None
+                    total_jobs = client.count_all_jobs(
+                        window,
+                        team=target.team,
+                        labels=cfg.digest.tiers or None,
+                        exclude_labels=cfg.digest.exclude_labels or None,
+                    )
+
                 mention = ""
                 if cfg.message.include_mentions and target.usergroup and resolver is not None:
                     mention = mention_for_handle(resolver, target.usergroup)
                 mention_suffix = f" — cc {mention}" if mention else ""
-                celebrate_text = (
-                    f"🎉 *rootcoz weekly digest* — {window.label}{mention_suffix}\n\n"
-                    f"✅ All clear for *{target.team}* this week!\n"
-                    "No unreviewed failures — either no failures occurred "
-                    "or all have been reviewed. 🚀"
-                )
+
+                # Build tier display string
+                tier_display = ", ".join(cfg.digest.tiers) if cfg.digest.tiers else "all tiers"
+
+                if total_jobs > 0:
+                    # All failures were reviewed!
+                    celebrate_text = (
+                        f"🎉 *rootcoz weekly digest* — {window.label}{mention_suffix}\n\n"
+                        f"✅ All *{total_jobs}* {tier_display} failures for "
+                        f"*{target.team}* have been reviewed! 👏"
+                    )
+                else:
+                    # No failures at all!
+                    celebrate_text = (
+                        f"🎉 *rootcoz weekly digest* — {window.label}{mention_suffix}\n\n"
+                        f"✅ Zero {tier_display} failures for "
+                        f"*{target.team}* this week! 🚀"
+                    )
+
                 if cfg.message.format is MessageFormat.BLOCKS:
                     celebrate_payload: list[dict[str, object]] | str = [
                         {"type": "section", "text": {"type": "mrkdwn", "text": celebrate_text}},
@@ -226,9 +249,11 @@ def run_digest(
                     TargetResult(target=target, payload=celebrate_payload, rows=[])
                 )
                 logger.info(
-                    "Target %s: all clear for team %r — celebration message",
+                    "Target %s: %s for team %r (total_jobs=%d)",
                     target.channel,
+                    "all reviewed" if total_jobs > 0 else "no failures",
                     target.team,
+                    total_jobs,
                 )
                 continue
             mention = ""

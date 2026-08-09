@@ -21,7 +21,11 @@ def test_fetch_job_rows_sends_server_side_filters() -> None:
                 {
                     "job_id": "j1",
                     "job_name": "tier2-network",
-                    "metadata": {"team": "network", "labels": ["gating"]},
+                    "metadata": {
+                        "team": "network",
+                        "version": "4.22",
+                        "labels": ["gating"],
+                    },
                     "failure_count": 2,
                     "reviewed_count": 0,
                     "build_number": 9,
@@ -46,6 +50,7 @@ def test_fetch_job_rows_sends_server_side_filters() -> None:
 
     assert len(rows) == 1
     assert rows[0].team == "network"
+    assert rows[0].version == "4.22"
     params = httpx.URL(captured["url"]).params
     assert params.get("team") == "network"
     assert params.get("date_from") == "2026-07-26"
@@ -53,3 +58,38 @@ def test_fetch_job_rows_sends_server_side_filters() -> None:
     assert params.get_list("label") == ["gating", "release-checklist"]
     assert params.get_list("exclude_label") == ["s390x"]
     assert params.get("review_status") == "not_reviewed"
+
+
+def test_count_all_jobs_omits_review_status() -> None:
+    captured: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        return httpx.Response(
+            200,
+            json=[
+                {"job_id": "j1"},
+                {"job_id": "j2"},
+                {"job_id": "j3"},
+            ],
+        )
+
+    transport = httpx.MockTransport(handler)
+    http = httpx.Client(transport=transport, base_url="https://rootcoz.example")
+    cfg = RootcozConfig(url="https://rootcoz.example", api_key="test-key")
+    window: WeekWindow = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
+
+    with RootcozClient(cfg, client=http) as client:
+        total = client.count_all_jobs(
+            window,
+            team="network",
+            labels=["gating"],
+            exclude_labels=["s390x"],
+        )
+
+    assert total == 3
+    params = httpx.URL(captured["url"]).params
+    assert "review_status" not in params
+    assert params.get("team") == "network"
+    assert params.get_list("label") == ["gating"]
+    assert params.get_list("exclude_label") == ["s390x"]
