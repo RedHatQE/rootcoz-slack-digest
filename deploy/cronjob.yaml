@@ -28,16 +28,28 @@ spec:
                 - |
                   set -euo pipefail
                   export HOME=/tmp
-                  # Private repo: Secret must include GITHUB_TOKEN (read access).
                   pip install --quiet --target=/tmp/pylibs \
-                    "rootcoz-slack-digest @ git+https://x-access-token:${GITHUB_TOKEN}@github.com/RedHatQE/rootcoz-slack-digest.git@${DIGEST_REPO_REF}"
+                    "rootcoz-slack-digest @ git+https://github.com/RedHatQE/rootcoz-slack-digest.git@${DIGEST_REPO_REF}"
                   PYTHONPATH=/tmp/pylibs PATH="/tmp/pylibs/bin:$PATH" \
                     python -m rootcoz_slack_digest run --config /config/config.toml
               env:
                 - name: DIGEST_REPO_REF
                   value: main
+                - name: ROOTCOZ_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: rootcoz-slack-digest-config
+                      key: ROOTCOZ_URL
                 - name: ROOTCOZ_VERIFY_SSL
-                  value: "false"
+                  valueFrom:
+                    configMapKeyRef:
+                      name: rootcoz-slack-digest-config
+                      key: ROOTCOZ_VERIFY_SSL
+                - name: SLACK_TARGETS
+                  valueFrom:
+                    configMapKeyRef:
+                      name: rootcoz-slack-digest-config
+                      key: SLACK_TARGETS
               envFrom:
                 - secretRef:
                     name: rootcoz-slack-digest-credentials

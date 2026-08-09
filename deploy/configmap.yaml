@@ -28,7 +28,10 @@ data:
 
     [slack]
     mode = "bot"
-
-    [mentions.teams]
-    # virt-node = "virt-node-qe"
-    # network = "network-qe"
+  ROOTCOZ_URL: "REPLACE"
+  ROOTCOZ_VERIFY_SSL: "true"
+  SLACK_TARGETS: |
+    [
+      {"team": "virt-node", "channel": "REPLACE", "usergroup": "virt-node-qe"},
+      {"team": "network", "channel": "REPLACE", "usergroup": "network-qe"}
+    ]

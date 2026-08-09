@@ -100,7 +100,7 @@ class DigestConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    max_rows: int = 25
+    max_rows: int = Field(default=25, ge=1)
     sort_by: SortBy = SortBy.NOT_REVIEWED
     tiers: list[str] = Field(default_factory=lambda: ["gating", "release-checklist", "other"])
     teams: list[str] = Field(default_factory=list)
@@ -151,22 +151,16 @@ class SlackConfig(BaseModel):
     mode: Literal["webhook", "bot"] = "bot"
     webhook_url: str = ""
     bot_token: str = ""
-    channel: str = ""
 
 
-class MentionsConfig(BaseModel):
-    """Team key → Slack usergroup handle (without @). Teams own membership."""
+class SlackTarget(BaseModel):
+    """One team→channel→usergroup routing entry from SLACK_TARGETS."""
 
     model_config = ConfigDict(frozen=True)
 
-    teams: dict[str, str] = Field(default_factory=dict)
-
-    @field_validator("teams", mode="before")
-    @classmethod
-    def _strip_at(cls, value: Any) -> Any:
-        if not isinstance(value, dict):
-            return value
-        return {str(k): str(v).lstrip("@") for k, v in value.items() if v is not None}
+    team: str
+    channel: str
+    usergroup: str = ""
 
 
 class AppConfig(BaseModel):
@@ -179,7 +173,6 @@ class AppConfig(BaseModel):
     message: MessageConfig = Field(default_factory=MessageConfig)
     rootcoz: RootcozConfig = Field(default_factory=RootcozConfig)
     slack: SlackConfig = Field(default_factory=SlackConfig)
-    mentions: MentionsConfig = Field(default_factory=MentionsConfig)
 
 
 def load_config(path: Path | None) -> AppConfig:

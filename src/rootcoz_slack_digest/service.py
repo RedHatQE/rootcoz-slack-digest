@@ -8,13 +8,21 @@ import os
 from dataclasses import dataclass
 from datetime import date
 
+from pydantic import ValidationError
+
 from rootcoz_slack_digest.mentions import (
     SlackUsergroupResolver,
     StaticUsergroupResolver,
     UsergroupResolver,
     mention_for_handle,
 )
-from rootcoz_slack_digest.models import AppConfig, JobRow, RootcozConfig, SlackConfig
+from rootcoz_slack_digest.models import (
+    AppConfig,
+    JobRow,
+    RootcozConfig,
+    SlackConfig,
+    SlackTarget,
+)
 from rootcoz_slack_digest.rootcoz_client import RootcozClient
 from rootcoz_slack_digest.slack_client import SlackClient
 from rootcoz_slack_digest.slack_format import build_message
@@ -24,12 +32,35 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class TargetResult:
+    """Result for one target."""
+
+    target: SlackTarget
+    payload: list[dict[str, object]] | str
+    rows: list[JobRow]
+
+
+@dataclass(frozen=True)
 class DigestResult:
     """Outcome of a digest run."""
 
-    payload: list[dict[str, object]] | str
-    rows: list[JobRow]
+    target_results: list[TargetResult]
+    all_rows: list[JobRow]
     posted: bool
+
+    @property
+    def payload(self) -> list[dict[str, object]] | str:
+        """First target payload for backward compat."""
+        if self.target_results:
+            return self.target_results[0].payload
+        return []
+
+    @property
+    def rows(self) -> list[JobRow]:
+        """First target rows for backward compat."""
+        if self.target_results:
+            return self.target_results[0].rows
+        return self.all_rows
 
     @property
     def blocks(self) -> list[dict[str, object]]:
@@ -53,7 +84,6 @@ def apply_env_overrides(config: AppConfig) -> AppConfig:
         update={
             "webhook_url": os.environ.get("SLACK_WEBHOOK_URL", config.slack.webhook_url),
             "bot_token": os.environ.get("SLACK_BOT_TOKEN", config.slack.bot_token),
-            "channel": os.environ.get("SLACK_CHANNEL", config.slack.channel),
         }
     )
     return config.model_copy(update={"rootcoz": rootcoz, "slack": slack})
@@ -66,6 +96,26 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _load_slack_targets() -> list[SlackTarget]:
+    """Parse ``SLACK_TARGETS`` JSON env into routing entries."""
+    raw = os.environ.get("SLACK_TARGETS", "")
+    if not raw:
+        return []
+    try:
+        entries = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        msg = f"SLACK_TARGETS is not valid JSON: {exc}"
+        raise ValueError(msg) from exc
+    if not isinstance(entries, list):
+        msg = "SLACK_TARGETS must be a JSON array of {team, channel, usergroup} objects"
+        raise ValueError(msg)
+    try:
+        return [SlackTarget.model_validate(e) for e in entries]
+    except ValidationError as exc:
+        msg = f"SLACK_TARGETS entry validation failed: {exc}"
+        raise ValueError(msg) from exc
+
+
 def run_digest(
     config: AppConfig,
     *,
@@ -73,6 +123,7 @@ def run_digest(
     date_from: date | None = None,
     date_to: date | None = None,
     rows: list[JobRow] | None = None,
+    targets: list[SlackTarget] | None = None,
     usergroup_resolver: UsergroupResolver | None = None,
     rootcoz_client: RootcozClient | None = None,
     slack_client: SlackClient | None = None,
@@ -81,6 +132,7 @@ def run_digest(
 
     When ``rows`` is provided, rootcoz is not contacted (tests / offline render).
     Message content always comes from API job rows — never from HTML report URLs.
+    Each ``SlackTarget`` gets a team-filtered digest posted to its channel.
     """
     cfg = apply_env_overrides(config)
     logger.info(
@@ -112,58 +164,115 @@ def run_digest(
             if own_rootcoz:
                 client.close()
 
-    mention = ""
-    if cfg.message.include_mentions:
-        mention = _resolve_primary_mention(cfg, usergroup_resolver)
+    resolved_targets = targets if targets is not None else _load_slack_targets()
+    if not resolved_targets:
+        if dry_run:
+            logger.warning("No SLACK_TARGETS configured; nothing to render")
+            return DigestResult(target_results=[], all_rows=rows, posted=False)
+        msg = "No SLACK_TARGETS configured; cannot post digest"
+        raise ValueError(msg)
 
-    payload = build_message(
-        window=window,
-        rows=rows,
-        max_rows=cfg.digest.max_rows,
-        sort_by=cfg.digest.sort_by,
-        columns=list(cfg.digest.columns),
-        message=cfg.message,
-        mention=mention,
-    )
+    if cfg.slack.mode == "webhook" and len(resolved_targets) > 1:
+        msg = (
+            "webhook mode does not support per-target channel routing; "
+            "use mode='bot' with SLACK_TARGETS"
+        )
+        raise ValueError(msg)
+
+    own_resolver = False
+    resolver = usergroup_resolver
+    needs_mentions = cfg.message.include_mentions and any(t.usergroup for t in resolved_targets)
+    if needs_mentions and resolver is None:
+        if cfg.slack.bot_token:
+            resolver = SlackUsergroupResolver(cfg.slack.bot_token)
+            own_resolver = True
+        else:
+            logger.warning("No bot token; cannot resolve usergroup mentions — posting without CC")
+
+    target_results: list[TargetResult] = []
+    try:
+        for target in resolved_targets:
+            filtered = [r for r in rows if r.team == target.team]
+            logger.info(
+                "Target %s: %d/%d rows matched team %r",
+                target.channel,
+                len(filtered),
+                len(rows),
+                target.team,
+            )
+            if not filtered:
+                if rows:
+                    logger.warning(
+                        "Target %s: no rows matched team %r (skipping post)",
+                        target.channel,
+                        target.team,
+                    )
+                continue
+            mention = ""
+            if cfg.message.include_mentions and target.usergroup and resolver is not None:
+                mention = mention_for_handle(resolver, target.usergroup)
+            payload = build_message(
+                window=window,
+                rows=filtered,
+                max_rows=cfg.digest.max_rows,
+                sort_by=cfg.digest.sort_by,
+                columns=list(cfg.digest.columns),
+                message=cfg.message,
+                mention=mention,
+            )
+            target_results.append(TargetResult(target=target, payload=payload, rows=filtered))
+    finally:
+        if own_resolver and isinstance(resolver, SlackUsergroupResolver):
+            resolver.close()
+
+    if not target_results:
+        if not rows:
+            # Quiet week — no failures to report. Successful no-op.
+            logger.info("No failures in window — nothing to post")
+            return DigestResult(target_results=[], all_rows=rows, posted=False)
+        if dry_run:
+            logger.warning("All targets filtered out — no rows matched any team")
+            return DigestResult(target_results=[], all_rows=rows, posted=False)
+        msg = "No target digests generated — no rows matched any SLACK_TARGETS team"
+        raise ValueError(msg)
 
     if dry_run:
-        logger.info("Dry-run: not posting to Slack (%d jobs from API)", len(rows))
-        return DigestResult(payload=payload, rows=rows, posted=False)
+        logger.info(
+            "Dry-run: not posting to Slack (%d jobs, %d targets)",
+            len(rows),
+            len(target_results),
+        )
+        return DigestResult(
+            target_results=target_results,
+            all_rows=rows,
+            posted=False,
+        )
 
     own_slack = slack_client is None
     sc = slack_client or SlackClient(cfg.slack)
     try:
-        sc.post(payload)
+        for tr in target_results:
+            logger.info(
+                "Posting digest to channel %s (team %s)",
+                tr.target.channel,
+                tr.target.team,
+            )
+            try:
+                sc.post(tr.payload, channel=tr.target.channel)
+            except Exception as exc:
+                msg = (
+                    f"Failed to post digest for team {tr.target.team!r} "
+                    f"to channel {tr.target.channel!r}: {exc}"
+                )
+                raise RuntimeError(msg) from exc
     finally:
         if own_slack:
             sc.close()
-    return DigestResult(payload=payload, rows=rows, posted=True)
-
-
-def _resolve_primary_mention(
-    cfg: AppConfig,
-    resolver: UsergroupResolver | None,
-) -> str:
-    """Build a CC line from configured team usergroups."""
-    handles = list(cfg.mentions.teams.values())
-    if not handles:
-        return ""
-
-    own = False
-    if resolver is None:
-        if cfg.slack.bot_token:
-            resolver = SlackUsergroupResolver(cfg.slack.bot_token)
-            own = True
-        else:
-            logger.warning("No bot token; cannot resolve usergroup mentions — posting without CC")
-            return ""
-
-    try:
-        parts = [mention_for_handle(resolver, h) for h in handles]
-        return " ".join(p for p in parts if p)
-    finally:
-        if own and isinstance(resolver, SlackUsergroupResolver):
-            resolver.close()
+    return DigestResult(
+        target_results=target_results,
+        all_rows=rows,
+        posted=True,
+    )
 
 
 def render_payload(payload: list[dict[str, object]] | str) -> str:
@@ -183,7 +292,9 @@ __all__ = [
     "DigestResult",
     "RootcozConfig",
     "SlackConfig",
+    "SlackTarget",
     "StaticUsergroupResolver",
+    "TargetResult",
     "apply_env_overrides",
     "render_blocks_json",
     "render_payload",

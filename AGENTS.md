@@ -2,7 +2,7 @@
 
 ## What this is
 
-Private RedHatQE tool: weekly Slack digest of rootcoz failures/reviews for CNV QE.
+RedHatQE tool: weekly Slack digest of rootcoz failures/reviews for CNV QE.
 Always query the **rootcoz API** before posting. Never depend on HTML summary URLs.
 
 ## Layout
@@ -21,7 +21,7 @@ Always query the **rootcoz API** before posting. Never depend on HTML summary UR
 - Frozen Pydantic models for config and rows
 - No mocks/stubs in `src/` — doubles stay in `tests/`
 - Secrets via env / K8s Secret only — never commit tokens
-- Team pings = Slack usergroups (`[mentions.teams]`); do not hardcode people
+- Team routing via `SLACK_TARGETS` JSON env (team → channel → usergroup); do not hardcode people
 
 ## Commands
 
