@@ -76,7 +76,7 @@ def test_build_message_blocks_no_html_summary() -> None:
     assert "HTML summary" not in blob
     assert "rootcause-summary" not in blob
     assert "```" not in blob
-    tables = [b for b in payload if b.get("type") == "table"]
+    tables = [b for b in payload if b.get("type") == "data_table"]
     assert tables
     assert "*gating*" in blob
     assert "https://jenkins.example/job/" in blob
@@ -191,7 +191,7 @@ def test_plain_format_is_string() -> None:
 
 
 def test_build_message_blocks_use_table() -> None:
-    """BLOCKS format uses native table blocks (one per tier) instead of text sections."""
+    """BLOCKS format uses data_table blocks (one per tier) instead of text sections."""
     window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
     rows = [
         _row("gate-a", 2, 0, tier="gating", bundle="v4.22.6.rhel9-9"),
@@ -214,14 +214,15 @@ def test_build_message_blocks_use_table() -> None:
     assert isinstance(payload, list)
     types = [b.get("type") for b in payload]
     assert types[:3] == ["section", "section", "divider"]
-    tables = [b for b in payload if b.get("type") == "table"]
+    tables = [b for b in payload if b.get("type") == "data_table"]
     assert len(tables) == 2
     # Tier headers between divider and tables when multiple tiers
     assert "*gating*" in str(payload)
     assert "*other*" in str(payload)
     gate_table = tables[0]
-    assert gate_table["column_settings"][0] == {"is_wrapped": True}
-    assert gate_table["column_settings"][2] == {"align": "right"}
+    assert gate_table["page_size"] == 100
+    assert gate_table["row_header_column_index"] == 0
+    assert gate_table["caption"]["elements"][0]["elements"][0]["text"] == "gating"
     header = gate_table["rows"][0]
     assert [c["text"] for c in header] == ["Job", "Bundle", "Reviewed", "rootcoz"]
     job_cell = gate_table["rows"][1][0]
