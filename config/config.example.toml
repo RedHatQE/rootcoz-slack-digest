@@ -4,7 +4,8 @@
 
 [schedule]
 # Keep deploy/cronjob.yaml spec.schedule in sync with this value.
-# Note: schedule.cron is a sync marker for deploy/cronjob.yaml; timezone is unused (week window always UTC).
+# Note: schedule.cron is a sync marker for deploy/cronjob.yaml; timezone is unused.
+# Week window is always the last complete Sun–Sat in UTC.
 cron = "0 7 * * 0"
 timezone = "UTC"
 
@@ -29,11 +30,12 @@ include_mentions = true
 header_template = "*rootcoz weekly digest* — {week_label}{mention_suffix}"
 # Placeholders: {total_jobs}, {total_failures}, {total_reviewed}, {week_label}
 totals_template = "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}/{total_failures}*"
-# row_template applies only when table_code_fence = false (list style).
+# row_template applies only for plain format when table_code_fence = false (list style).
 # Placeholders: {job_name}, {tier}, {team}, {failures}, {reviewed}, {not_reviewed}, {build}, {jenkins_url}, {rootcoz_url}, {jenkins_link}, {rootcoz_link}, {jenkins_part}, {rootcoz_part}, {job_id}
 row_template = "• *{job_name}* ({tier}) — fail {failures} / rev {reviewed}{jenkins_part}{rootcoz_part}"
 # Placeholders: {omitted}
 omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
+# table_code_fence only applies to plain format; blocks/mrkdwn use grouped-by-tier links.
 table_code_fence = true
 
 [rootcoz]

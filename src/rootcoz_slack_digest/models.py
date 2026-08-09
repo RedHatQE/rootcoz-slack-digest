@@ -52,7 +52,7 @@ DEFAULT_COLUMNS: list[DigestColumn] = [
 
 
 class WeekWindow(BaseModel):
-    """Inclusive Mon–Sun UTC week window."""
+    """Inclusive Sun–Sat UTC week window."""
 
     model_config = ConfigDict(frozen=True)
 

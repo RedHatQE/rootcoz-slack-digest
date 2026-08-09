@@ -8,6 +8,7 @@ metadata:
 data:
   config.toml: |
     [schedule]
+    # Week window is always the last complete Sun–Sat in UTC.
     cron = "0 7 * * 0"
     timezone = "UTC"
 
@@ -27,6 +28,7 @@ data:
     header_template = "*rootcoz weekly digest* — {week_label}{mention_suffix}"
     totals_template = "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}/{total_failures}*"
     omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
+    # table_code_fence only applies to plain format; blocks/mrkdwn use grouped-by-tier links.
     table_code_fence = true
 
     [rootcoz]

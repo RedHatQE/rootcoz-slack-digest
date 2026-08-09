@@ -96,7 +96,7 @@ def format_rows_text(
     *,
     mrkdwn: bool,
 ) -> str:
-    """Render job rows using columns and/or row_template."""
+    """Render job rows grouped by tier with inline links (mrkdwn) or as a table."""
     if not rows:
         return (
             "_No completed jobs with failures in this window._"
@@ -104,12 +104,55 @@ def format_rows_text(
             else "No completed jobs with failures in this window."
         )
 
-    # Prefer explicit column table when using blocks/mrkdwn defaults.
+    if mrkdwn:
+        return _format_grouped_by_tier(rows)
+
+    # Plain/non-mrkdwn: keep the column table
     if message.table_code_fence and columns:
-        return _format_column_table(rows, columns, mrkdwn=mrkdwn)
+        return _format_column_table(rows, columns, mrkdwn=False)
 
     lines = [_safe_format(message.row_template, "row", **_row_template_vars(row)) for row in rows]
     return "\n".join(lines)
+
+
+# Tier display order: gating first, then release-checklist, then everything else
+_TIER_ORDER = {"gating": 0, "release-checklist": 1}
+
+
+def _format_grouped_by_tier(rows: list[JobRow]) -> str:
+    """Format rows grouped by tier with inline mrkdwn links.
+
+    Order: gating → release-checklist → other tiers alphabetically.
+    Within each tier, sorted by failure_count descending.
+    """
+    groups: dict[str, list[JobRow]] = {}
+    for row in rows:
+        groups.setdefault(row.tier, []).append(row)
+
+    sorted_tiers = sorted(
+        groups.keys(),
+        key=lambda t: (_TIER_ORDER.get(t, 99), t),
+    )
+
+    sections: list[str] = []
+    for tier in sorted_tiers:
+        tier_rows = sorted(groups[tier], key=lambda r: -r.failure_count)
+        lines = [f"*{tier}*"]
+        for row in tier_rows:
+            if row.jenkins_url:
+                name_part = _link(row.job_name, row.jenkins_url)
+            else:
+                name_part = f"*{row.job_name}*"
+
+            stats = f"fail {row.failure_count} / rev {row.reviewed_count}"
+            parts = [f"• {name_part} — {stats}"]
+            if row.rootcoz_url:
+                parts.append(_link("rootcoz", row.rootcoz_url))
+
+            lines.append(" · ".join(parts))
+        sections.append("\n".join(lines))
+
+    return "\n\n".join(sections)
 
 
 def _format_column_table(
@@ -118,7 +161,7 @@ def _format_column_table(
     *,
     mrkdwn: bool,
 ) -> str:
-    """Build a simple aligned table; mrkdwn path uses a code fence only (no link bullets)."""
+    """Build a simple aligned table for plain (non-mrkdwn) output."""
     link_cols = {DigestColumn.JENKINS, DigestColumn.ROOTCOZ}
     text_cols = [c for c in columns if c not in link_cols]
     if not text_cols:
@@ -169,23 +212,52 @@ def _safe_format(template: str, template_name: str, **kwargs: object) -> str:
 def _split_blocks(
     text: str, block_type: str = "section", max_chars: int = 2900
 ) -> list[dict[str, object]]:
-    """Split long text into multiple Slack blocks, preserving code fences."""
+    """Split long text into multiple Slack blocks at tier-group boundaries."""
     if len(text) <= max_chars:
         return [{"type": block_type, "text": {"type": "mrkdwn", "text": text}}]
 
-    # Try to split at code fence boundary first
-    fence_end = text.find("\n```\n")
-    if fence_end == -1:
-        fence_end = text.find("\n```")
+    # Prefer splitting between tier groups (double-newline separated)
+    if "\n\n" in text:
+        groups = text.split("\n\n")
+        blocks: list[dict[str, object]] = []
+        chunk_parts: list[str] = []
+        chunk_len = 0
 
-    if fence_end != -1:
-        # Split into: code fence part + rest
-        fence_part = text[: fence_end + 4]  # include the closing ```
-        rest = text[fence_end + 4 :].strip()
+        for group in groups:
+            if len(group) > max_chars:
+                if chunk_parts:
+                    blocks.append(
+                        {
+                            "type": block_type,
+                            "text": {"type": "mrkdwn", "text": "\n\n".join(chunk_parts)},
+                        }
+                    )
+                    chunk_parts = []
+                    chunk_len = 0
+                blocks.extend(_split_by_lines(group, block_type, max_chars))
+                continue
 
-        blocks = _split_by_lines(fence_part, block_type, max_chars)
-        if rest:
-            blocks.extend(_split_by_lines(rest, block_type, max_chars))
+            sep = 2 if chunk_parts else 0
+            if chunk_parts and chunk_len + sep + len(group) > max_chars:
+                blocks.append(
+                    {
+                        "type": block_type,
+                        "text": {"type": "mrkdwn", "text": "\n\n".join(chunk_parts)},
+                    }
+                )
+                chunk_parts = [group]
+                chunk_len = len(group)
+            else:
+                chunk_len += sep + len(group)
+                chunk_parts.append(group)
+
+        if chunk_parts:
+            blocks.append(
+                {
+                    "type": block_type,
+                    "text": {"type": "mrkdwn", "text": "\n\n".join(chunk_parts)},
+                }
+            )
         return blocks
 
     return _split_by_lines(text, block_type, max_chars)

@@ -13,11 +13,11 @@ from rootcoz_slack_digest.slack_format import build_message, sort_rows
 from rootcoz_slack_digest.week import week_from_dates
 
 
-def _row(name: str, failures: int, reviewed: int) -> JobRow:
+def _row(name: str, failures: int, reviewed: int, *, tier: str = "gating") -> JobRow:
     return JobRow(
         job_id=name,
         job_name=name,
-        tier="gating",
+        tier=tier,
         failure_count=failures,
         reviewed_count=reviewed,
         jenkins_url=f"https://jenkins.example/job/{name}/1/",
@@ -36,8 +36,14 @@ def test_sort_by_not_reviewed() -> None:
 
 
 def test_build_message_blocks_no_html_summary() -> None:
-    window = week_from_dates(date(2026, 7, 27), date(2026, 8, 2))
-    rows = [_row(f"job-{i}", 2, 0) for i in range(5)]
+    window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
+    rows = [
+        _row("job-a", 14, 0, tier="gating"),
+        _row("job-b", 23, 0, tier="gating"),
+        _row("job-c", 14, 0, tier="release-checklist"),
+        _row("job-d", 23, 0, tier="other"),
+        _row("job-e", 2, 0, tier="other"),
+    ]
     payload = build_message(
         window=window,
         rows=rows,
@@ -59,11 +65,42 @@ def test_build_message_blocks_no_html_summary() -> None:
     assert "cc <!subteam^S1>" in blob
     assert "HTML summary" not in blob
     assert "rootcause-summary" not in blob
+    assert "```" not in blob
+    assert "*gating*" in blob
+    assert "<https://jenkins.example/job/" in blob
+    assert "|rootcoz>" in blob
     assert "+3 more" in blob
 
 
+def test_grouped_by_tier_order_and_links() -> None:
+    window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
+    rows = [
+        _row("other-job", 5, 0, tier="other"),
+        _row("rc-job", 14, 0, tier="release-checklist"),
+        _row("gate-low", 10, 0, tier="gating"),
+        _row("gate-high", 23, 0, tier="gating"),
+    ]
+    payload = build_message(
+        window=window,
+        rows=rows,
+        max_rows=10,
+        sort_by=SortBy.JOB_NAME,
+        columns=list(DigestColumn),
+        message=MessageConfig(format=MessageFormat.MRKDWN),
+    )
+    assert isinstance(payload, str)
+    gating_idx = payload.index("*gating*")
+    rc_idx = payload.index("*release-checklist*")
+    other_idx = payload.index("*other*")
+    assert gating_idx < rc_idx < other_idx
+    # Within gating: higher failures first
+    assert payload.index("gate-high") < payload.index("gate-low")
+    assert "<https://jenkins.example/job/gate-high/1/|gate-high>" in payload
+    assert "fail 23 / rev 0 · <https://rootcoz.example/results/gate-high|rootcoz>" in payload
+
+
 def test_columns_omit_jenkins() -> None:
-    window = week_from_dates(date(2026, 7, 27), date(2026, 8, 2))
+    window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
     payload = build_message(
         window=window,
         rows=[_row("only", 1, 0)],
@@ -74,12 +111,13 @@ def test_columns_omit_jenkins() -> None:
         mention="",
     )
     assert isinstance(payload, str)
+    # Job name is the Jenkins link label; no separate "Jenkins" column label
     assert "Jenkins" not in payload
     assert "rootcoz" in payload
 
 
 def test_plain_format_is_string() -> None:
-    window = week_from_dates(date(2026, 7, 27), date(2026, 8, 2))
+    window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
     payload = build_message(
         window=window,
         rows=[_row("j", 1, 0)],
@@ -94,9 +132,14 @@ def test_plain_format_is_string() -> None:
 
 def test_build_message_splits_long_body() -> None:
     """Body over 2900 chars becomes multiple section blocks under the limit."""
-    window = week_from_dates(date(2026, 7, 27), date(2026, 8, 2))
+    window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
     rows = [
-        _row(f"very-long-job-name-{i:03d}-padding-xxxxxxxxxxxxxxxxxxxx", 2, 0)
+        _row(
+            f"very-long-job-name-{i:03d}-padding-xxxxxxxxxxxxxxxxxxxx",
+            2,
+            0,
+            tier="gating" if i < 40 else "other",
+        )
         for i in range(80)
     ]
     payload = build_message(
