@@ -108,7 +108,7 @@ def format_rows_text(
     if message.table_code_fence and columns:
         return _format_column_table(rows, columns, mrkdwn=mrkdwn)
 
-    lines = [message.row_template.format(**_row_template_vars(row)) for row in rows]
+    lines = [_safe_format(message.row_template, "row", **_row_template_vars(row)) for row in rows]
     return "\n".join(lines)
 
 
@@ -139,15 +139,18 @@ def _format_column_table(
         body_lines.append(fmt_line([_column_value(row, c, mrkdwn=False) for c in text_cols]))
 
     if not mrkdwn:
-        # Append raw URLs for link columns
-        extra: list[str] = []
-        for row in rows:
-            bits = [row.job_name]
-            for col in columns:
-                if col in link_cols:
-                    bits.append(_column_value(row, col, mrkdwn=False))
-            extra.append(" | ".join(bits))
-        return "\n".join(body_lines + extra)
+        # Append raw URLs for link columns (only if any link columns selected)
+        link_selected = [col for col in columns if col in link_cols]
+        if link_selected:
+            extra: list[str] = []
+            for row in rows:
+                bits = [row.job_name]
+                for col in columns:
+                    if col in link_cols:
+                        bits.append(_column_value(row, col, mrkdwn=False))
+                extra.append(" | ".join(bits))
+            return "\n".join(body_lines + extra)
+        return "\n".join(body_lines)
 
     fenced = "```\n" + "\n".join(body_lines) + "\n```"
     link_lines: list[str] = []
@@ -165,6 +168,16 @@ def _format_column_table(
     return fenced
 
 
+def _safe_format(template: str, template_name: str, **kwargs: object) -> str:
+    """Format a template string with clear error on unknown placeholders."""
+    try:
+        return template.format(**kwargs)
+    except KeyError as exc:
+        allowed = ", ".join(sorted(str(k) for k in kwargs))
+        msg = f"{template_name} template has unknown placeholder {exc}; allowed: {allowed}"
+        raise ValueError(msg) from exc
+
+
 def build_message(
     *,
     window: WeekWindow,
@@ -179,6 +192,7 @@ def build_message(
 
     Returns Block Kit list for ``blocks`` format, otherwise a string.
     """
+    max_rows = max(max_rows, 1)
     ordered = sort_rows(rows, sort_by)
     total_failures = sum(r.failure_count for r in ordered)
     total_reviewed = sum(r.reviewed_count for r in ordered)
@@ -190,12 +204,16 @@ def build_message(
     if message.include_mentions and mention:
         mention_suffix = f" — cc {mention}"
 
-    header = message.header_template.format(
+    header = _safe_format(
+        message.header_template,
+        "header",
         week_label=window.label,
         mention_suffix=mention_suffix,
         mention=mention,
     )
-    totals = message.totals_template.format(
+    totals = _safe_format(
+        message.totals_template,
+        "totals",
         total_jobs=total_jobs,
         total_failures=total_failures,
         total_reviewed=total_reviewed,
@@ -205,7 +223,7 @@ def build_message(
     body = format_rows_text(shown, columns, message, mrkdwn=mrkdwn)
     omitted_text = ""
     if omitted:
-        omitted_text = message.omitted_template.format(omitted=omitted)
+        omitted_text = _safe_format(message.omitted_template, "omitted", omitted=omitted)
 
     if message.format is MessageFormat.BLOCKS:
         blocks: list[dict[str, object]] = [

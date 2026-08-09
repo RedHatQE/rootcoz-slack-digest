@@ -1,9 +1,10 @@
 # Copy to config.toml (gitignored) or mount as ConfigMap in-cluster.
-# Secrets (ROOTCOZ_*, SLACK_*) come from the environment / K8s Secret.
+# Secrets (credentials) come from K8s Secret; non-secret env (ROOTCOZ_URL, ROOTCOZ_VERIFY_SSL, SLACK_TARGETS) from ConfigMap.
 # Message data is always loaded from the rootcoz API — no HTML report URLs.
 
 [schedule]
 # Keep deploy/cronjob.yaml spec.schedule in sync with this value.
+# Note: schedule.cron is a sync marker for deploy/cronjob.yaml; timezone is unused (week window always UTC).
 cron = "0 7 * * 0"
 timezone = "UTC"
 
@@ -20,9 +21,14 @@ columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
 [message]
 format = "blocks" # blocks | mrkdwn | plain
 include_mentions = true
+# Placeholders: {week_label}, {mention_suffix}, {mention}
 header_template = "*rootcoz weekly digest* — {week_label}{mention_suffix}"
+# Placeholders: {total_jobs}, {total_failures}, {total_reviewed}, {week_label}
 totals_template = "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}*"
+# row_template applies only when table_code_fence = false (list style).
+# Placeholders: {job_name}, {tier}, {team}, {failures}, {reviewed}, {not_reviewed}, {build}, {jenkins_url}, {rootcoz_url}, {jenkins_link}, {rootcoz_link}, {jenkins_part}, {rootcoz_part}, {job_id}
 row_template = "• *{job_name}* ({tier}) — fail {failures} / rev {reviewed}{jenkins_part}{rootcoz_part}"
+# Placeholders: {omitted}
 omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
 table_code_fence = true
 
@@ -35,15 +41,10 @@ verify_ssl = true
 
 [slack]
 # Prefer bot mode for usergroup mentions (<!subteam^ID>).
+# Prefer env: SLACK_BOT_TOKEN, SLACK_WEBHOOK_URL
+# Team → channel routing comes from SLACK_TARGETS env / ConfigMap (JSON):
+#   [{"team": "virt-node", "channel": "C...", "usergroup": "virt-node-qe"}]
+# Note: webhook mode supports at most one SLACK_TARGETS entry; use bot mode for multi-target routing.
 mode = "bot"
-# Prefer env: SLACK_BOT_TOKEN, SLACK_CHANNEL, SLACK_WEBHOOK_URL
 bot_token = ""
-channel = ""
 webhook_url = ""
-
-# Team key → Slack usergroup handle (without @).
-# Teams manage membership in Slack; this map rarely changes.
-[mentions.teams]
-# virt-node = "virt-node-qe"
-# network = "network-qe"
-# storage-platform = "storage-platform-qe"

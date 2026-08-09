@@ -60,9 +60,19 @@ def run_cmd(
     )
     result = run_digest(cfg, dry_run=dry_run, date_from=df, date_to=dt)
     if dry_run:
-        typer.echo(render_payload(result.payload))
+        if not result.target_results:
+            typer.echo("(no matching targets to render)")
+            return
+        for tr in result.target_results:
+            typer.echo(f"# team={tr.target.team} channel={tr.target.channel}")
+            typer.echo(render_payload(tr.payload))
     else:
-        typer.echo(f"Posted digest ({len(result.rows)} jobs from rootcoz API).")
+        if result.posted:
+            n_jobs = len(result.all_rows)
+            n_targets = len(result.target_results)
+            typer.echo(f"Posted digest ({n_jobs} jobs, {n_targets} targets).")
+        else:
+            typer.echo("No failures in window — nothing posted.")
 
 
 @app.command("render")
@@ -81,7 +91,7 @@ def render_cmd(
     ] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
 ) -> None:
-    """Same as ``run --dry-run`` (stdout Block Kit JSON)."""
+    """Same as ``run --dry-run`` (stdout payload per target)."""
     run_cmd(
         config=config,
         dry_run=True,

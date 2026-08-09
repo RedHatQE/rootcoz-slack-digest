@@ -37,18 +37,22 @@ class SlackClient:
     def __exit__(self, *args: object) -> None:
         self.close()
 
-    def post(self, payload: list[dict[str, object]] | str) -> None:
+    def post(
+        self,
+        payload: list[dict[str, object]] | str,
+        channel: str | None = None,
+    ) -> None:
         """Post blocks or text using configured mode."""
         text = payload_fallback_text(payload)
         blocks = payload if isinstance(payload, list) else None
         if self._config.mode == "webhook":
             self._post_webhook(text, blocks)
             return
-        self._post_chat(text, blocks)
+        self._post_chat(text, blocks, channel=channel)
 
-    def post_blocks(self, blocks: list[dict[str, object]]) -> None:
+    def post_blocks(self, blocks: list[dict[str, object]], channel: str | None = None) -> None:
         """Backward-compatible alias for ``post`` with Block Kit."""
-        self.post(blocks)
+        self.post(blocks, channel=channel)
 
     def _post_webhook(self, text: str, blocks: list[dict[str, object]] | None) -> None:
         if not self._config.webhook_url:
@@ -61,15 +65,21 @@ class SlackClient:
         resp.raise_for_status()
         logger.info("Posted digest via Slack webhook")
 
-    def _post_chat(self, text: str, blocks: list[dict[str, object]] | None) -> None:
+    def _post_chat(
+        self,
+        text: str,
+        blocks: list[dict[str, object]] | None,
+        channel: str | None = None,
+    ) -> None:
         if not self._config.bot_token:
             msg = "slack.bot_token (or SLACK_BOT_TOKEN) is required for bot mode"
             raise ValueError(msg)
-        if not self._config.channel:
-            msg = "slack.channel is required for bot mode"
+        ch = channel or ""
+        if not ch:
+            msg = "channel is required for bot mode (pass channel from SLACK_TARGETS)"
             raise ValueError(msg)
         payload: dict[str, Any] = {
-            "channel": self._config.channel,
+            "channel": ch,
             "text": text,
         }
         if blocks is not None:
@@ -84,4 +94,4 @@ class SlackClient:
         if not data.get("ok"):
             msg = data.get("error", "chat.postMessage failed")
             raise RuntimeError(f"Slack API error: {msg}")
-        logger.info("Posted digest to Slack channel %s", self._config.channel)
+        logger.info("Posted digest to Slack channel %s", ch)

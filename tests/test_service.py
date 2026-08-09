@@ -3,24 +3,26 @@
 from datetime import date
 
 from rootcoz_slack_digest.mentions import StaticUsergroupResolver
-from rootcoz_slack_digest.models import AppConfig, JobRow, MentionsConfig
+from rootcoz_slack_digest.models import AppConfig, JobRow, SlackTarget
 from rootcoz_slack_digest.service import run_digest
 
 
 def test_run_digest_dry_run_with_injected_rows() -> None:
-    cfg = AppConfig(
-        mentions=MentionsConfig(teams={"network": "network-qe"}),
-    )
+    cfg = AppConfig()
     rows = [
         JobRow(
             job_id="j1",
             job_name="tier2-network",
             tier="gating",
+            team="network",
             failure_count=4,
             reviewed_count=1,
             jenkins_url="https://jenkins.example/job/tier2-network/9/",
             rootcoz_url="https://rootcoz.example/results/j1",
         )
+    ]
+    targets = [
+        SlackTarget(team="network", channel="Cnetwork", usergroup="network-qe"),
     ]
     result = run_digest(
         cfg,
@@ -28,9 +30,11 @@ def test_run_digest_dry_run_with_injected_rows() -> None:
         date_from=date(2026, 7, 27),
         date_to=date(2026, 8, 2),
         rows=rows,
+        targets=targets,
         usergroup_resolver=StaticUsergroupResolver({"network-qe": "S42"}),
     )
     assert result.posted is False
+    assert len(result.target_results) == 1
     assert len(result.rows) == 1
     blob = str(result.payload)
     assert "<!subteam^S42>" in blob
