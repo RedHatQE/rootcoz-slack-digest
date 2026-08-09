@@ -106,6 +106,7 @@ class DigestConfig(BaseModel):
     columns: list[DigestColumn] = Field(default_factory=lambda: list(DEFAULT_COLUMNS))
     exclude_tags: list[str] = Field(default_factory=list)
     exclude_labels: list[str] = Field(default_factory=list)
+    exclude_job_patterns: list[str] = Field(default_factory=list)
 
     @field_validator("columns", mode="before")
     @classmethod
@@ -124,7 +125,8 @@ class MessageConfig(BaseModel):
     include_mentions: bool = True
     header_template: str = "*rootcoz weekly digest* — {week_label}{mention_suffix}"
     totals_template: str = (
-        "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}*"
+        "Jobs: *{total_jobs}* · Failures: *{total_failures}* · "
+        "Reviewed: *{total_reviewed}/{total_failures}*"
     )
     row_template: str = (
         "• *{job_name}* ({tier}) — fail {failures} / rev {reviewed}{jenkins_part}{rootcoz_part}"

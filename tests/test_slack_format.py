@@ -95,11 +95,14 @@ def test_plain_format_is_string() -> None:
 def test_build_message_splits_long_body() -> None:
     """Body over 2900 chars becomes multiple section blocks under the limit."""
     window = week_from_dates(date(2026, 7, 27), date(2026, 8, 2))
-    rows = [_row(f"very-long-job-name-{i:03d}-padding-xxxxxxxx", 2, 0) for i in range(40)]
+    rows = [
+        _row(f"very-long-job-name-{i:03d}-padding-xxxxxxxxxxxxxxxxxxxx", 2, 0)
+        for i in range(80)
+    ]
     payload = build_message(
         window=window,
         rows=rows,
-        max_rows=40,
+        max_rows=80,
         sort_by=SortBy.JOB_NAME,
         columns=[
             DigestColumn.JOB_NAME,

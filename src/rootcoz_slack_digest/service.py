@@ -153,6 +153,7 @@ def run_digest(
                 window,
                 exclude_tags=cfg.digest.exclude_tags or None,
                 exclude_labels=cfg.digest.exclude_labels or None,
+                exclude_job_patterns=cfg.digest.exclude_job_patterns or None,
             )
         finally:
             if own_rootcoz:

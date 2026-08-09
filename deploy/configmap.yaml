@@ -18,12 +18,14 @@ data:
     columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
     exclude_tags = ["s390x"]
     exclude_labels = []
+    # Exclude jobs whose name contains these substrings.
+    exclude_job_patterns = ["s390x"]
 
     [message]
     format = "blocks"
     include_mentions = true
     header_template = "*rootcoz weekly digest* — {week_label}{mention_suffix}"
-    totals_template = "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}*"
+    totals_template = "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}/{total_failures}*"
     omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
     table_code_fence = true
 

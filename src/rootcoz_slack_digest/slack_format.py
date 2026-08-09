@@ -118,7 +118,7 @@ def _format_column_table(
     *,
     mrkdwn: bool,
 ) -> str:
-    """Build a simple aligned table; link columns listed after the fence when mrkdwn."""
+    """Build a simple aligned table; mrkdwn path uses a code fence only (no link bullets)."""
     link_cols = {DigestColumn.JENKINS, DigestColumn.ROOTCOZ}
     text_cols = [c for c in columns if c not in link_cols]
     if not text_cols:
@@ -153,18 +153,6 @@ def _format_column_table(
         return "\n".join(body_lines)
 
     fenced = "```\n" + "\n".join(body_lines) + "\n```"
-    link_lines: list[str] = []
-    for row in rows:
-        parts = [f"• *{row.job_name}*"]
-        for col in columns:
-            if col is DigestColumn.JENKINS and row.jenkins_url:
-                parts.append(_link("Jenkins", row.jenkins_url))
-            elif col is DigestColumn.ROOTCOZ and row.rootcoz_url:
-                parts.append(_link("rootcoz", row.rootcoz_url))
-        if len(parts) > 1:
-            link_lines.append(" · ".join(parts))
-    if link_lines:
-        return fenced + "\n" + "\n".join(link_lines)
     return fenced
 
 

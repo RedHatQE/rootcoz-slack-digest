@@ -54,11 +54,13 @@ class RootcozClient:
         *,
         exclude_tags: list[str] | None = None,
         exclude_labels: list[str] | None = None,
+        exclude_job_patterns: list[str] | None = None,
     ) -> list[JobRow]:
         """Fetch jobs using configured endpoint, params, and field mapping."""
         fm = self._config.field_map
         params = dict(self._config.params)
         params["from"] = window.date_from.isoformat()
+        params["to"] = window.date_to.isoformat()
 
         resp = self._client.get(self._config.endpoint, params=params)
         resp.raise_for_status()
@@ -102,6 +104,10 @@ class RootcozClient:
                 rootcoz_url = resolve_template(fm.rootcoz, resolved_fields, config_vars)
             else:
                 rootcoz_url = str(resolve_path(job, fm.rootcoz) or "")
+
+            # Check job name exclusions
+            if exclude_job_patterns and any(pat in job_name for pat in exclude_job_patterns):
+                continue
 
             metadata = job.get("metadata") if isinstance(job.get("metadata"), dict) else {}
             job_tags = [str(t) for t in (job.get("tags") or [])]
