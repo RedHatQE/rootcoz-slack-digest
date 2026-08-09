@@ -62,7 +62,7 @@ def test_fetch_job_rows_sends_server_side_filters() -> None:
     assert params.get("review_status") == "not_reviewed"
 
 
-def test_count_all_jobs_omits_review_status() -> None:
+def test_fetch_all_jobs_omits_review_status() -> None:
     captured: dict[str, Any] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -70,9 +70,9 @@ def test_count_all_jobs_omits_review_status() -> None:
         return httpx.Response(
             200,
             json=[
-                {"job_id": "j1"},
-                {"job_id": "j2"},
-                {"job_id": "j3"},
+                {"job_id": "j1", "job_name": "job-one"},
+                {"job_id": "j2", "job_name": "job-two"},
+                {"job_id": "j3", "job_name": "job-three"},
             ],
         )
 
@@ -82,14 +82,16 @@ def test_count_all_jobs_omits_review_status() -> None:
     window: WeekWindow = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
 
     with RootcozClient(cfg, client=http) as client:
-        total = client.count_all_jobs(
+        rows = client.fetch_all_jobs(
             window,
             team="network",
             labels=["gating"],
             exclude_labels=["s390x"],
         )
 
-    assert total == 3
+    assert len(rows) == 3
+    assert rows[0].job_id == "j1"
+    assert rows[0].rootcoz_url == "https://rootcoz.example/results/j1"
     params = httpx.URL(captured["url"]).params
     assert "review_status" not in params
     assert params.get("team") == "network"

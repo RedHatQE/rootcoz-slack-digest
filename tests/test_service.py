@@ -5,7 +5,7 @@ from datetime import date
 
 import pytest
 
-from rootcoz_slack_digest.mentions import StaticUsergroupResolver
+from fakes import FakeRootcozClient, StaticUsergroupResolver
 from rootcoz_slack_digest.models import (
     AppConfig,
     EmailConfig,
@@ -84,7 +84,7 @@ def test_run_digest_celebrates_when_team_has_no_unreviewed_failures() -> None:
     assert result.target_results[0].rows == []
     assert result.target_results[0].total_jobs == 0
     blob = str(result.payload)
-    # Injected-rows mode skips count_all_jobs → treated as zero failures
+    # Injected-rows mode skips fetch_all_jobs → treated as zero failures
     assert "Zero" in blob
     assert "failures for" in blob
     assert "*network*" in blob
@@ -135,6 +135,80 @@ def test_run_digest_sends_email_when_enabled() -> None:
     assert fake.sent[0]["cc"] == ["cc@example.com"]
     assert "network" in str(fake.sent[0]["subject"])
     assert "tier2-network" in str(fake.sent[0]["html_body"])
+
+
+def test_run_digest_celebration_includes_rootcoz_links() -> None:
+    cfg = AppConfig()
+    all_jobs = [
+        JobRow(
+            job_id="j1",
+            job_name="tier2-network-a",
+            team="network",
+            rootcoz_url="https://rootcoz.example/results/j1",
+        ),
+        JobRow(
+            job_id="j2",
+            job_name="tier2-network-b",
+            team="network",
+            rootcoz_url="https://rootcoz.example/results/j2",
+        ),
+    ]
+    result = run_digest(
+        cfg,
+        dry_run=True,
+        date_from=date(2026, 7, 27),
+        date_to=date(2026, 8, 2),
+        targets=[_slack_target()],
+        usergroup_resolver=StaticUsergroupResolver({"network-qe": "S42"}),
+        rootcoz_client=FakeRootcozClient(unreviewed=[], all_jobs=all_jobs),  # type: ignore[arg-type]
+    )
+    assert result.target_results[0].total_jobs == 2
+    assert len(result.target_results[0].celebration_jobs) == 2
+    blob = str(result.payload)
+    assert "All" in blob
+    assert "<https://rootcoz.example/results/j1|tier2-network-a>" in blob
+    assert "<https://rootcoz.example/results/j2|tier2-network-b>" in blob
+
+
+def test_run_digest_email_celebration_includes_job_links() -> None:
+    class FakeEmail:
+        def __init__(self) -> None:
+            self.sent: list[dict[str, object]] = []
+
+        def send(self, **kwargs: object) -> None:
+            self.sent.append(kwargs)
+
+    cfg = AppConfig(email=EmailConfig(enabled=True))
+    all_jobs = [
+        JobRow(
+            job_id="j1",
+            job_name="tier2-network",
+            team="network",
+            rootcoz_url="https://rootcoz.example/results/j1",
+        )
+    ]
+    targets = [
+        Target(
+            team="network",
+            email=EmailTargetConfig(recipients=["net@example.com"]),
+        )
+    ]
+    fake = FakeEmail()
+    result = run_digest(
+        cfg,
+        dry_run=False,
+        date_from=date(2026, 7, 27),
+        date_to=date(2026, 8, 2),
+        targets=targets,
+        email_client=fake,  # type: ignore[arg-type]
+        rootcoz_client=FakeRootcozClient(unreviewed=[], all_jobs=all_jobs),  # type: ignore[arg-type]
+    )
+    assert result.posted is True
+    assert result.target_results[0].total_jobs == 1
+    html_body = str(fake.sent[0]["html_body"])
+    assert "All" in html_body
+    assert 'href="https://rootcoz.example/results/j1"' in html_body
+    assert "tier2-network" in html_body
 
 
 def test_run_digest_email_celebration_uses_total_jobs() -> None:

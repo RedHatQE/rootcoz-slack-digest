@@ -92,14 +92,3 @@ class SlackUsergroupResolver:
     def resolve(self, handle: str) -> str | None:
         """Return usergroup id for handle, or None."""
         return self._load().get(handle.lstrip("@"))
-
-
-class StaticUsergroupResolver:
-    """Test/double resolver with a fixed handle → id map."""
-
-    def __init__(self, mapping: dict[str, str]) -> None:
-        self._mapping = {k.lstrip("@"): v for k, v in mapping.items()}
-
-    def resolve(self, handle: str) -> str | None:
-        """Return usergroup id for handle, or None."""
-        return self._mapping.get(handle.lstrip("@"))

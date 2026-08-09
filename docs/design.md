@@ -3,7 +3,7 @@
 ## Goal
 
 On a configurable Cron schedule, query the **rootcoz API** for the last complete
-Mon–Sun week and post a Slack message (job, tier, failures, reviewed, links).
+Sun–Sat week and post a Slack message (job, tier, failures, reviewed, links).
 Optional HTML email delivery uses the same API rows.
 
 ## Boundaries
@@ -20,11 +20,13 @@ Optional HTML email delivery uses the same API rows.
 Bearer auth → GET /api/dashboard/filtered → format message → Slack and/or email
 ```
 
-No HTML summary URLs. A week with no failing jobs is a successful no-op — nothing is posted.
+No HTML summary URLs. When a team has zero unreviewed failures, a celebration
+message is posted instead of a digest table — either "Zero failures this week"
+or "All N failures reviewed". Templates live under `[message]`.
 
 ## Data Flow
 
-- **Week window:** last complete Mon–Sun in UTC (computed by `week.py`)
+- **Week window:** last complete Sun–Sat in UTC (computed by `week.py`)
 - **Rootcoz API:** `GET /api/dashboard/filtered` with `Authorization: Bearer <api_key>`,
   `date_from`/`date_to`, `review_status=not_reviewed`, and `limit=0`
 - **Job links:** rootcoz `/results/{job_id}`; Jenkins URLs from the API response

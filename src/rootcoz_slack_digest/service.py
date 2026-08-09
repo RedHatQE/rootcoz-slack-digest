@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 from pydantic import ValidationError
@@ -14,7 +14,6 @@ from rootcoz_slack_digest.email_client import EmailClient
 from rootcoz_slack_digest.email_format import format_celebration_html, format_digest_html
 from rootcoz_slack_digest.mentions import (
     SlackUsergroupResolver,
-    StaticUsergroupResolver,
     UsergroupResolver,
     mention_for_handle,
 )
@@ -28,7 +27,7 @@ from rootcoz_slack_digest.models import (
 )
 from rootcoz_slack_digest.rootcoz_client import RootcozClient
 from rootcoz_slack_digest.slack_client import SlackClient
-from rootcoz_slack_digest.slack_format import build_message
+from rootcoz_slack_digest.slack_format import _safe_format, build_message
 from rootcoz_slack_digest.week import last_complete_week, week_from_dates
 
 logger = logging.getLogger(__name__)
@@ -42,6 +41,7 @@ class TargetResult:
     payload: list[dict[str, object]] | str
     rows: list[JobRow]
     total_jobs: int = 0
+    celebration_jobs: list[JobRow] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -174,6 +174,12 @@ def run_digest(
         )
         raise ValueError(msg)
 
+    email_only_targets = [t for t in resolved_targets if t.email and not t.slack]
+    if email_only_targets and not cfg.email.enabled:
+        names = ", ".join(t.team for t in email_only_targets)
+        msg = f"Targets [{names}] have email delivery only but email.enabled is false"
+        raise ValueError(msg)
+
     own_resolver = False
     resolver = usergroup_resolver
     needs_mentions = cfg.message.include_mentions and any(
@@ -225,15 +231,21 @@ def run_digest(
             usergroup = target.slack.usergroup if target.slack is not None else ""
             if not target_rows:
                 # Check if there were failures that are all reviewed
-                total_jobs = 0
+                all_jobs: list[JobRow] = []
                 if rows is None:  # Only query API if not in test mode
                     assert client is not None
-                    total_jobs = client.count_all_jobs(
+                    all_jobs = client.fetch_all_jobs(
                         window,
                         team=target.team,
                         labels=api_labels or None,
                         exclude_labels=cfg.digest.exclude_labels or None,
                     )
+                    if cfg.digest.exclude_job_patterns:
+                        patterns = cfg.digest.exclude_job_patterns
+                        all_jobs = [
+                            r for r in all_jobs if not any(pat in r.job_name for pat in patterns)
+                        ]
+                total_jobs = len(all_jobs)
 
                 mention = ""
                 if cfg.message.include_mentions and usergroup and resolver is not None:
@@ -251,12 +263,27 @@ def run_digest(
                 }
 
                 if total_jobs > 0:
-                    celebrate_text = cfg.message.celebration_reviewed_template.format(
-                        **template_vars
+                    celebrate_text = _safe_format(
+                        cfg.message.celebration_reviewed_template,
+                        "celebration_reviewed",
+                        **template_vars,
                     )
+                    shown_jobs = all_jobs[:20]
+                    link_lines = [
+                        f"• <{job.rootcoz_url}|{job.job_name}>"
+                        if job.rootcoz_url
+                        else f"• {job.job_name}"
+                        for job in shown_jobs
+                    ]
+                    if link_lines:
+                        celebrate_text += "\n" + "\n".join(link_lines)
+                    if len(all_jobs) > 20:
+                        celebrate_text += f"\n_+{len(all_jobs) - 20} more reviewed jobs_"
                 else:
-                    celebrate_text = cfg.message.celebration_no_failures_template.format(
-                        **template_vars
+                    celebrate_text = _safe_format(
+                        cfg.message.celebration_no_failures_template,
+                        "celebration_no_failures",
+                        **template_vars,
                     )
 
                 if cfg.message.format is MessageFormat.BLOCKS:
@@ -271,6 +298,7 @@ def run_digest(
                         payload=celebrate_payload,
                         rows=[],
                         total_jobs=total_jobs,
+                        celebration_jobs=all_jobs if total_jobs > 0 else [],
                     )
                 )
                 logger.info(
@@ -307,17 +335,6 @@ def run_digest(
             client.close()
         if own_resolver and isinstance(resolver, SlackUsergroupResolver):
             resolver.close()
-
-    if not target_results:
-        if not all_rows:
-            # Quiet week — no failures to report. Successful no-op.
-            logger.info("No failures in window — nothing to post")
-            return DigestResult(target_results=[], all_rows=all_rows, posted=False)
-        if dry_run:
-            logger.warning("All targets filtered out — no rows matched any team")
-            return DigestResult(target_results=[], all_rows=all_rows, posted=False)
-        msg = "No target digests generated — no rows matched any TARGETS team"
-        raise ValueError(msg)
 
     if dry_run:
         logger.info(
@@ -364,7 +381,9 @@ def run_digest(
             if tr.target.email is None:
                 continue
             tier_display = ", ".join(cfg.digest.tiers) if cfg.digest.tiers else "all"
-            subject = cfg.message.email_subject_template.format(
+            subject = _safe_format(
+                cfg.message.email_subject_template,
+                "email_subject",
                 week_label=window.label,
                 team=tr.target.team,
                 lanes=tier_display,
@@ -382,6 +401,7 @@ def run_digest(
                     team=tr.target.team,
                     total_jobs=tr.total_jobs,
                     tiers=tiers,
+                    jobs=tr.celebration_jobs,
                 )
             logger.info(
                 "Sending digest email for team %s to %s",
@@ -427,7 +447,6 @@ __all__ = [
     "DigestResult",
     "RootcozConfig",
     "SlackConfig",
-    "StaticUsergroupResolver",
     "Target",
     "TargetResult",
     "apply_env_overrides",

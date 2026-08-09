@@ -11,6 +11,7 @@ from rootcoz_slack_digest.models import (
     SortBy,
     WeekWindow,
 )
+from rootcoz_slack_digest.utils import version_sort_key
 
 
 def sort_rows(rows: list[JobRow], sort_by: SortBy) -> list[JobRow]:
@@ -120,27 +121,6 @@ def format_rows_text(
     return "\n".join(lines)
 
 
-def _version_sort_key(version: str) -> tuple[int, ...]:
-    """Parse version string into comparable tuple. Handles v4.22.6.rhel9-9."""
-    if not version:
-        return (0,)
-    cleaned = version.lstrip("v")
-    parts: list[int] = []
-    for part in cleaned.split("."):
-        # Handle parts like "rhel9-9" by extracting leading digits
-        digits = ""
-        for ch in part:
-            if ch.isdigit():
-                digits += ch
-            else:
-                break
-        try:
-            parts.append(int(digits) if digits else 0)
-        except ValueError:
-            parts.append(0)
-    return tuple(parts)
-
-
 def _format_grouped_by_tier(rows: list[JobRow], tiers: list[str] | None = None) -> str:
     """Format rows grouped by tier with inline mrkdwn links.
 
@@ -162,8 +142,8 @@ def _format_grouped_by_tier(rows: list[JobRow], tiers: list[str] | None = None) 
         tier_rows = sorted(
             groups[tier],
             key=lambda r: (
-                _version_sort_key(r.version),
-                _version_sort_key(r.bundle.lstrip("v")),
+                version_sort_key(r.version),
+                version_sort_key(r.bundle.lstrip("v")),
                 r.failure_count,
             ),
             reverse=True,
@@ -226,8 +206,8 @@ def _build_table_blocks(
         tier_rows = sorted(
             groups[tier],
             key=lambda r: (
-                _version_sort_key(r.version),
-                _version_sort_key(r.bundle.lstrip("v")),
+                version_sort_key(r.version),
+                version_sort_key(r.bundle.lstrip("v")),
                 r.failure_count,
             ),
             reverse=True,

@@ -65,7 +65,7 @@ data:
     enabled = false
     smtp_host = "smtp.example.com"
     smtp_port = 25
-    from_address = "rootcoz-digest@redhat.com"
+    from_address = "digest@example.com"
     use_tls = false
   ROOTCOZ_URL: "REPLACE"
   ROOTCOZ_VERIFY_SSL: "true"

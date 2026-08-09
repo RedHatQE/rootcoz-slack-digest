@@ -272,7 +272,7 @@ class EmailConfig(BaseModel):
     enabled: bool = False
     smtp_host: str = "smtp.example.com"
     smtp_port: int = 25
-    from_address: str = "rootcoz-digest@redhat.com"
+    from_address: str = "digest@example.com"
     use_tls: bool = False
 
 

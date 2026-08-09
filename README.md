@@ -8,7 +8,7 @@ auth). This tool does **not** use or link to HTML coverage/rootcause summary pag
 Jenkins and rootcoz result URLs come from the API response (no `JENKINS_URL` env).
 
 On a configurable schedule (or on demand via CLI), it queries rootcoz for a date
-window (default: last complete Mon–Sun), formats a configurable table (job, tier,
+window (default: last complete Sun–Sat), formats a configurable table (job, tier,
 failures, reviewed, Jenkins + rootcoz links), and posts to Slack and/or email.
 Teams are CC'd via **Slack usergroups** they manage themselves.
 
@@ -43,21 +43,28 @@ TOML sections: `schedule`, `digest`, `message`, `slack`, `rootcoz`, `email`.
 ```toml
 [schedule]
 # Sync marker only — OpenShift CronJob spec.schedule is what triggers runs.
-# Week window is always Mon–Sun UTC (timezone setting is unused).
+# Week window is always Sun–Sat UTC (timezone setting is unused).
 cron = "0 7 * * 0"
 
 [digest]
 columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
+# Also: exclude_labels, exclude_job_patterns, sort_by, max_rows, tiers
 
 [message]
 format = "blocks"           # blocks | mrkdwn | plain
 header_template = "*rootcoz digest* — {week_label}{mention_suffix}"
+# Also: celebration_*_template, email_subject_template, totals/row/omitted templates
+
+[rootcoz]
+# field_map, tier_labels (incl. default_tier), bundle_pattern, endpoint/params
 
 [email]
 enabled = false
 ```
 
-See `config/config.example.toml` for all keys (columns, message templates, tiers).
+See `config/config.example.toml` for all keys (columns, message templates, tiers,
+`exclude_labels`, `exclude_job_patterns`, celebration templates,
+`email_subject_template`, `bundle_pattern`, `default_tier`, and more).
 Team routing is via `TARGETS`, not `[digest]` config.
 
 ## Mentions (no people lists in git)
@@ -70,11 +77,14 @@ Team routing is via `TARGETS`, not `[digest]` config.
 ```
 
 Each entry posts a team-filtered digest — rows are matched by `row.team == target.team`.
-Targets with no matching jobs get a celebration message (zero failures or all reviewed).
+When a team has zero unreviewed failures, a **celebration** message is posted instead:
+- **Zero failures this week** — no failures at all for that team
+- **All N failures reviewed** — failures existed but all were reviewed
+Celebration templates (`celebration_no_failures_template`,
+`celebration_reviewed_template`) are configurable under `[message]`.
 Team strings must exactly match rootcoz job metadata.
-If no jobs have failures in the window, the run succeeds with nothing posted (quiet week).
 If jobs exist but no team matches any `TARGETS` entry, the run fails with an error (likely a team name mismatch in config).
-Dry-run prints `(no matching targets to render)` in both cases.
+Dry-run prints `(no matching targets to render)` when nothing matches.
 Multi-target Slack routing requires `slack.mode = "bot"`; webhook mode supports at most one `TARGETS` entry with Slack.
 
 Requires Slack bot scopes: `chat:write`, `usergroups:read`.

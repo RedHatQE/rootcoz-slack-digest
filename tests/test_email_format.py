@@ -42,3 +42,48 @@ def test_format_celebration_html_zero_and_all_reviewed() -> None:
     )
     assert "All" in reviewed
     assert "5" in reviewed
+
+
+def test_format_celebration_html_includes_job_links() -> None:
+    window = WeekWindow(date_from=date(2026, 7, 27), date_to=date(2026, 8, 2))
+    jobs = [
+        JobRow(
+            job_id="j1",
+            job_name="tier2-network",
+            rootcoz_url="https://rootcoz.example/results/j1",
+        ),
+        JobRow(job_id="j2", job_name="no-link-job"),
+    ]
+    html = format_celebration_html(
+        window=window,
+        team="network",
+        total_jobs=2,
+        tiers=["gating"],
+        jobs=jobs,
+    )
+    assert 'href="https://rootcoz.example/results/j1"' in html
+    assert "tier2-network" in html
+    assert "<li>no-link-job</li>" in html
+
+
+def test_format_celebration_html_truncates_links() -> None:
+    window = WeekWindow(date_from=date(2026, 7, 27), date_to=date(2026, 8, 2))
+    jobs = [
+        JobRow(
+            job_id=f"j{i}",
+            job_name=f"job-{i}",
+            rootcoz_url=f"https://rootcoz.example/results/j{i}",
+        )
+        for i in range(25)
+    ]
+    html = format_celebration_html(
+        window=window,
+        team="network",
+        total_jobs=25,
+        tiers=["gating"],
+        jobs=jobs,
+    )
+    assert "+5 more reviewed jobs" in html
+    assert "job-0" in html
+    assert "job-19" in html
+    assert "job-20" not in html

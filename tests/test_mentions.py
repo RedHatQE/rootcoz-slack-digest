@@ -1,10 +1,7 @@
 """Tests for Slack usergroup mention formatting."""
 
-from rootcoz_slack_digest.mentions import (
-    StaticUsergroupResolver,
-    format_usergroup_mention,
-    mention_for_handle,
-)
+from fakes import StaticUsergroupResolver
+from rootcoz_slack_digest.mentions import format_usergroup_mention, mention_for_handle
 
 
 def test_format_usergroup_mention() -> None:

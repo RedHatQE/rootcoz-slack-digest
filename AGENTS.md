@@ -2,8 +2,10 @@
 
 ## What this is
 
-REPLACE_ORG tool: weekly Slack digest of rootcoz failures/reviews for CNV QE.
-Always query the **rootcoz API** before posting. Never depend on HTML summary URLs.
+REPLACE_ORG tool: weekly Slack (and optional email) digest of rootcoz failures/reviews
+for CNV QE. Always query the **rootcoz API** (`GET /api/dashboard/filtered` with
+Bearer auth) before posting. Never depend on HTML summary URLs.
+Default week window is the last complete Sun–Sat (UTC).
 
 ## Layout
 
@@ -22,6 +24,8 @@ Always query the **rootcoz API** before posting. Never depend on HTML summary UR
 - No mocks/stubs in `src/` — doubles stay in `tests/`
 - Secrets via env / K8s Secret only — never commit tokens
 - Team routing via `TARGETS` JSON env (team → optional slack/email); do not hardcode people
+- Rootcoz field paths and display tiers are configurable (`[rootcoz.field_map]`,
+  `[rootcoz.tier_labels]`, `bundle_pattern`, `default_tier`)
 
 ## Commands
 

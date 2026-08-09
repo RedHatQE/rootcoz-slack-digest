@@ -38,7 +38,7 @@ quote-style = "double"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "tests"]
 addopts = "--cov=rootcoz_slack_digest --cov-report=term-missing"
 
 [tool.mypy]
