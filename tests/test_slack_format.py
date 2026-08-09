@@ -213,7 +213,6 @@ def test_build_message_blocks_use_table() -> None:
     )
     assert isinstance(payload, list)
     types = [b.get("type") for b in payload]
-    assert types[0] == "section"
     assert "divider" not in types
     tables = [b for b in payload if b.get("type") == "data_table"]
     assert len(tables) == 2
@@ -223,7 +222,10 @@ def test_build_message_blocks_use_table() -> None:
     gate_table = tables[0]
     assert gate_table["page_size"] == 100
     assert gate_table["row_header_column_index"] == 0
-    assert gate_table["caption"] == "gating"
+    # Digest title lives in the first table caption (no separate header section)
+    assert "*rootcoz" in str(gate_table["caption"])
+    assert "weekly digest" in str(gate_table["caption"])
+    assert tables[1]["caption"] == "other"
     header = gate_table["rows"][0]
     assert [c["text"] for c in header] == ["Jobs (2)", "Bundle", "Reviewed (0/5)", "rootcoz"]
     job_cell = gate_table["rows"][1][0]

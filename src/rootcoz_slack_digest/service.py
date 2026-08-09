@@ -237,7 +237,7 @@ def run_digest(
                 mention = ""
                 if cfg.message.include_mentions and usergroup and resolver is not None:
                     mention = mention_for_handle(resolver, usergroup)
-                mention_suffix = f" — cc {mention}" if mention else ""
+                mention_suffix = f" — {mention}" if mention else ""
 
                 # Build tier display string
                 tier_display = ", ".join(cfg.digest.tiers) if cfg.digest.tiers else "all tiers"

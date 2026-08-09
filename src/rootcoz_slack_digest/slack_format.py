@@ -209,6 +209,7 @@ def _build_table_blocks(
     total_jobs: int = 0,
     total_reviewed: int = 0,
     total_failures: int = 0,
+    header: str = "",
 ) -> list[dict[str, object]]:
     """Build Slack table blocks grouped by tier with links."""
     groups: dict[str, list[JobRow]] = {}
@@ -223,7 +224,7 @@ def _build_table_blocks(
     blocks: list[dict[str, object]] = []
     show_tier_header = len(sorted_tiers) > 1
 
-    for tier in sorted_tiers:
+    for i, tier in enumerate(sorted_tiers):
         tier_rows = sorted(
             groups[tier],
             key=lambda r: (
@@ -273,7 +274,13 @@ def _build_table_blocks(
 
         # data_table: page_size keeps rows expanded (table collapses by default)
         # caption must be a plain string (not rich_text)
-        caption_text = tier if show_tier_header else " "
+        # Caption: header for first table, tier for subsequent multi-tier tables
+        if i == 0 and header:
+            caption_text = header
+        elif show_tier_header:
+            caption_text = tier
+        else:
+            caption_text = " "
         blocks.append(
             {
                 "type": "data_table",
@@ -365,7 +372,7 @@ def build_message(
 
     mention_suffix = ""
     if message.include_mentions and mention:
-        mention_suffix = f" — cc {mention}"
+        mention_suffix = f" — {mention}"
 
     lanes = ", ".join(tiers) if tiers else ""
     header = _safe_format(
@@ -395,11 +402,9 @@ def build_message(
             total_jobs=total_jobs,
             total_reviewed=total_reviewed,
             total_failures=total_failures,
+            header=header,
         )
-        blocks: list[dict[str, object]] = [
-            {"type": "section", "text": {"type": "mrkdwn", "text": header}},
-            *table_blocks,
-        ]
+        blocks: list[dict[str, object]] = [*table_blocks]
         if omitted_text:
             blocks.append(
                 {
@@ -453,6 +458,9 @@ def blocks_to_fallback_text(blocks: list[dict[str, object]]) -> str:
         text = block.get("text")
         if isinstance(text, dict) and "text" in text:
             parts.append(str(text["text"]))
+        caption = block.get("caption")
+        if isinstance(caption, str) and caption.strip():
+            parts.append(caption)
     return "\n".join(parts) if parts else "rootcoz weekly digest"
 
 
