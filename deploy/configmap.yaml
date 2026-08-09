@@ -9,8 +9,8 @@ data:
   config.toml: |
     [schedule]
     # Week window is always the last complete Sun–Sat in UTC.
-    cron = "0 7 * * 0"
-    timezone = "UTC"
+    cron = "0 10 * * 0"
+    timezone = "Asia/Jerusalem"
 
     [digest]
     # 0 = no limit. exclude_labels are API query params; exclude_job_patterns is client-side name filter.

@@ -6,8 +6,8 @@
 # Keep deploy/cronjob.yaml spec.schedule in sync with this value.
 # Note: schedule.cron is a sync marker for deploy/cronjob.yaml; timezone is unused.
 # Week window is always the last complete Sun–Sat in UTC.
-cron = "0 7 * * 0"
-timezone = "UTC"
+cron = "0 10 * * 0"
+timezone = "Asia/Jerusalem"
 
 [digest]
 # 0 = no limit (show all jobs). Positive N truncates the Slack message.

@@ -7,7 +7,8 @@ metadata:
     app: rootcoz-slack-digest
 spec:
   # Must match [schedule].cron in config / ConfigMap
-  schedule: "0 7 * * 0"
+  schedule: "0 10 * * 0"
+  timeZone: "Asia/Jerusalem"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
