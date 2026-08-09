@@ -27,8 +27,8 @@ exclude_job_patterns = ["s390x"]
 [message]
 format = "blocks" # blocks | mrkdwn | plain
 include_mentions = true
-# Placeholders: {week_label}, {mention_suffix}, {mention}
-header_template = "*rootcoz weekly digest* — {week_label}{mention_suffix}"
+# Placeholders: {week_label}, {mention_suffix}, {mention}, {lanes}
+header_template = "*rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}"
 # Placeholders: {total_jobs}, {total_failures}, {total_reviewed}, {week_label}
 totals_template = "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}/{total_failures}*"
 # row_template applies only for plain format when table_code_fence = false (list style).

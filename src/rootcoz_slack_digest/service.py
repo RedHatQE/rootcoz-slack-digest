@@ -288,6 +288,7 @@ def run_digest(
                 columns=list(cfg.digest.columns),
                 message=cfg.message,
                 mention=mention,
+                tiers=cfg.digest.tiers or None,
             )
             target_results.append(
                 TargetResult(

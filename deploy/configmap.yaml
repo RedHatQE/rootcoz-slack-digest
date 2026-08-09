@@ -24,7 +24,7 @@ data:
     [message]
     format = "blocks"
     include_mentions = true
-    header_template = "*rootcoz weekly digest* — {week_label}{mention_suffix}"
+    header_template = "*rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}"
     totals_template = "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}/{total_failures}*"
     omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
     # table_code_fence only applies to plain format; blocks/mrkdwn use grouped-by-tier links.

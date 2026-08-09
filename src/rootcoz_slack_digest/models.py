@@ -127,7 +127,7 @@ class MessageConfig(BaseModel):
 
     format: MessageFormat = MessageFormat.BLOCKS
     include_mentions: bool = True
-    header_template: str = "*rootcoz weekly digest* — {week_label}{mention_suffix}"
+    header_template: str = "*rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}"
     totals_template: str = (
         "Jobs: *{total_jobs}* · Failures: *{total_failures}* · "
         "Reviewed: *{total_reviewed}/{total_failures}*"
