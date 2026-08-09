@@ -29,7 +29,7 @@ def test_format_digest_html_includes_rows_and_links() -> None:
     assert "tier2-network" in html
     assert "https://jenkins.example/job/n/1/" in html
     assert "https://rootcoz.example/results/j1" in html
-    assert "1 out of 3 reviewed [v4.22.6.rhel9-9]" in html
+    assert "1 / 3 reviewed [v4.22.6.rhel9-9]" in html
 
 
 def test_format_celebration_html_zero_and_all_reviewed() -> None:

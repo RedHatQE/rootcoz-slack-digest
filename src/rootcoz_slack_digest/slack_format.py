@@ -178,7 +178,7 @@ def _format_grouped_by_tier(rows: list[JobRow]) -> str:
                 name_part = f"*{row.job_name}*"
 
             bundle_part = f" [{row.bundle}]" if row.bundle else ""
-            stats = f"{row.reviewed_count} out of {row.failure_count} reviewed{bundle_part}"
+            stats = f"{row.reviewed_count} / {row.failure_count} reviewed{bundle_part}"
             parts = [f"• {name_part} — {stats}"]
             if row.rootcoz_url:
                 parts.append(_link("rootcoz", row.rootcoz_url))

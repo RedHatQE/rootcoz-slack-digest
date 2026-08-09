@@ -58,7 +58,7 @@ def format_digest_html(
             bundle_html = f" [{row.bundle}]" if row.bundle else ""
             html_parts.append(
                 f"<li>{name_html} — "
-                f"{row.reviewed_count} out of {row.failure_count} reviewed"
+                f"{row.reviewed_count} / {row.failure_count} reviewed"
                 f"{bundle_html}{rootcoz_html}</li>"
             )
         html_parts.append("</ul>")

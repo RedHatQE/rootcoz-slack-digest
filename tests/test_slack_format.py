@@ -123,7 +123,7 @@ def test_grouped_by_tier_order_and_links() -> None:
     # Within gating: higher failures first
     assert payload.index("gate-high") < payload.index("gate-low")
     assert "<https://jenkins.example/job/gate-high/1/|gate-high>" in payload
-    assert "0 out of 23 reviewed · <https://rootcoz.example/results/gate-high|rootcoz>" in payload
+    assert "0 / 23 reviewed · <https://rootcoz.example/results/gate-high|rootcoz>" in payload
 
 
 def test_grouped_by_tier_sorts_by_version_then_bundle_then_failures() -> None:
@@ -148,8 +148,8 @@ def test_grouped_by_tier_sorts_by_version_then_bundle_then_failures() -> None:
     assert payload.index("job-4.23") < payload.index("job-4.22-high")
     assert payload.index("job-4.22-high") < payload.index("job-4.22-low")
     assert payload.index("job-4.22-low") < payload.index("job-4.22-older")
-    assert "0 out of 3 reviewed [v5.0.0.rhel9-9]" in payload
-    assert "0 out of 14 reviewed [v4.22.6.rhel9-9]" in payload
+    assert "0 / 3 reviewed [v5.0.0.rhel9-9]" in payload
+    assert "0 / 14 reviewed [v4.22.6.rhel9-9]" in payload
 
 
 def test_columns_omit_jenkins() -> None:
