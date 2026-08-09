@@ -1,4 +1,4 @@
-"""Orchestrate week → rootcoz API → format → Slack."""
+"""Orchestrate week → rootcoz API → format → Slack / email."""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ from datetime import date
 
 from pydantic import ValidationError
 
+from rootcoz_slack_digest.email_client import EmailClient
+from rootcoz_slack_digest.email_format import format_celebration_html, format_digest_html
 from rootcoz_slack_digest.mentions import (
     SlackUsergroupResolver,
     StaticUsergroupResolver,
@@ -22,7 +24,7 @@ from rootcoz_slack_digest.models import (
     MessageFormat,
     RootcozConfig,
     SlackConfig,
-    SlackTarget,
+    Target,
 )
 from rootcoz_slack_digest.rootcoz_client import RootcozClient
 from rootcoz_slack_digest.slack_client import SlackClient
@@ -36,9 +38,10 @@ logger = logging.getLogger(__name__)
 class TargetResult:
     """Result for one target."""
 
-    target: SlackTarget
+    target: Target
     payload: list[dict[str, object]] | str
     rows: list[JobRow]
+    total_jobs: int = 0
 
 
 @dataclass(frozen=True)
@@ -96,24 +99,33 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _load_slack_targets() -> list[SlackTarget]:
-    """Parse ``SLACK_TARGETS`` JSON env into routing entries."""
-    raw = os.environ.get("SLACK_TARGETS", "")
+def _load_targets() -> list[Target]:
+    """Parse ``TARGETS`` JSON env into routing entries."""
+    raw = os.environ.get("TARGETS", "")
     if not raw:
         return []
     try:
         entries = json.loads(raw)
     except json.JSONDecodeError as exc:
-        msg = f"SLACK_TARGETS is not valid JSON: {exc}"
+        msg = f"TARGETS is not valid JSON: {exc}"
         raise ValueError(msg) from exc
     if not isinstance(entries, list):
-        msg = "SLACK_TARGETS must be a JSON array of {team, channel, usergroup} objects"
+        msg = "TARGETS must be a JSON array of {team, slack?, email?} objects"
         raise ValueError(msg)
     try:
-        return [SlackTarget.model_validate(e) for e in entries]
+        return [Target.model_validate(e) for e in entries]
     except ValidationError as exc:
-        msg = f"SLACK_TARGETS entry validation failed: {exc}"
+        msg = f"TARGETS entry validation failed: {exc}"
         raise ValueError(msg) from exc
+
+
+def _target_label(target: Target) -> str:
+    """Human-readable target id for logs."""
+    if target.slack is not None:
+        return target.slack.channel
+    if target.email is not None:
+        return ",".join(target.email.recipients)
+    return target.team
 
 
 def run_digest(
@@ -123,16 +135,17 @@ def run_digest(
     date_from: date | None = None,
     date_to: date | None = None,
     rows: list[JobRow] | None = None,
-    targets: list[SlackTarget] | None = None,
+    targets: list[Target] | None = None,
     usergroup_resolver: UsergroupResolver | None = None,
     rootcoz_client: RootcozClient | None = None,
     slack_client: SlackClient | None = None,
+    email_client: EmailClient | None = None,
 ) -> DigestResult:
     """Query rootcoz API for the week, format the message, optionally post.
 
     When ``rows`` is provided, rootcoz is not contacted (tests / offline render).
     Message content always comes from API job rows — never from HTML report URLs.
-    Each ``SlackTarget`` gets a team-filtered digest posted to its channel.
+    Each ``Target`` gets a team-filtered digest delivered via Slack and/or email.
     Live runs fetch once per target with server-side team/label filters.
     """
     cfg = apply_env_overrides(config)
@@ -146,24 +159,26 @@ def run_digest(
     else:
         window = last_complete_week()
 
-    resolved_targets = targets if targets is not None else _load_slack_targets()
+    resolved_targets = targets if targets is not None else _load_targets()
     if not resolved_targets:
         if dry_run:
-            logger.warning("No SLACK_TARGETS configured; nothing to render")
+            logger.warning("No TARGETS configured; nothing to render")
             return DigestResult(target_results=[], all_rows=rows or [], posted=False)
-        msg = "No SLACK_TARGETS configured; cannot post digest"
+        msg = "No TARGETS configured; cannot post digest"
         raise ValueError(msg)
 
-    if cfg.slack.mode == "webhook" and len(resolved_targets) > 1:
+    slack_target_count = sum(1 for t in resolved_targets if t.slack is not None)
+    if cfg.slack.mode == "webhook" and slack_target_count > 1:
         msg = (
-            "webhook mode does not support per-target channel routing; "
-            "use mode='bot' with SLACK_TARGETS"
+            "webhook mode does not support per-target channel routing; use mode='bot' with TARGETS"
         )
         raise ValueError(msg)
 
     own_resolver = False
     resolver = usergroup_resolver
-    needs_mentions = cfg.message.include_mentions and any(t.usergroup for t in resolved_targets)
+    needs_mentions = cfg.message.include_mentions and any(
+        t.slack is not None and t.slack.usergroup for t in resolved_targets
+    )
     if needs_mentions and resolver is None:
         if cfg.slack.bot_token:
             resolver = SlackUsergroupResolver(cfg.slack.bot_token)
@@ -200,10 +215,11 @@ def run_digest(
             all_rows.extend(target_rows)
             logger.info(
                 "Target %s: %d rows for team %r",
-                target.channel,
+                _target_label(target),
                 len(target_rows),
                 target.team,
             )
+            usergroup = target.slack.usergroup if target.slack is not None else ""
             if not target_rows:
                 # Check if there were failures that are all reviewed
                 total_jobs = 0
@@ -217,8 +233,8 @@ def run_digest(
                     )
 
                 mention = ""
-                if cfg.message.include_mentions and target.usergroup and resolver is not None:
-                    mention = mention_for_handle(resolver, target.usergroup)
+                if cfg.message.include_mentions and usergroup and resolver is not None:
+                    mention = mention_for_handle(resolver, usergroup)
                 mention_suffix = f" — cc {mention}" if mention else ""
 
                 # Build tier display string
@@ -246,19 +262,24 @@ def run_digest(
                 else:
                     celebrate_payload = celebrate_text
                 target_results.append(
-                    TargetResult(target=target, payload=celebrate_payload, rows=[])
+                    TargetResult(
+                        target=target,
+                        payload=celebrate_payload,
+                        rows=[],
+                        total_jobs=total_jobs,
+                    )
                 )
                 logger.info(
                     "Target %s: %s for team %r (total_jobs=%d)",
-                    target.channel,
+                    _target_label(target),
                     "all reviewed" if total_jobs > 0 else "no failures",
                     target.team,
                     total_jobs,
                 )
                 continue
             mention = ""
-            if cfg.message.include_mentions and target.usergroup and resolver is not None:
-                mention = mention_for_handle(resolver, target.usergroup)
+            if cfg.message.include_mentions and usergroup and resolver is not None:
+                mention = mention_for_handle(resolver, usergroup)
             payload = build_message(
                 window=window,
                 rows=target_rows,
@@ -268,7 +289,14 @@ def run_digest(
                 message=cfg.message,
                 mention=mention,
             )
-            target_results.append(TargetResult(target=target, payload=payload, rows=target_rows))
+            target_results.append(
+                TargetResult(
+                    target=target,
+                    payload=payload,
+                    rows=target_rows,
+                    total_jobs=len(target_rows),
+                )
+            )
     finally:
         if own_rootcoz and client is not None:
             client.close()
@@ -283,12 +311,12 @@ def run_digest(
         if dry_run:
             logger.warning("All targets filtered out — no rows matched any team")
             return DigestResult(target_results=[], all_rows=all_rows, posted=False)
-        msg = "No target digests generated — no rows matched any SLACK_TARGETS team"
+        msg = "No target digests generated — no rows matched any TARGETS team"
         raise ValueError(msg)
 
     if dry_run:
         logger.info(
-            "Dry-run: not posting to Slack (%d jobs, %d targets)",
+            "Dry-run: not posting (%d jobs, %d targets)",
             len(all_rows),
             len(target_results),
         )
@@ -298,30 +326,77 @@ def run_digest(
             posted=False,
         )
 
-    own_slack = slack_client is None
-    sc = slack_client or SlackClient(cfg.slack)
-    try:
+    posted_any = False
+    slack_results = [tr for tr in target_results if tr.target.slack is not None]
+    if slack_results:
+        own_slack = slack_client is None
+        sc = slack_client or SlackClient(cfg.slack)
+        try:
+            for tr in slack_results:
+                assert tr.target.slack is not None
+                logger.info(
+                    "Posting digest to channel %s (team %s)",
+                    tr.target.slack.channel,
+                    tr.target.team,
+                )
+                try:
+                    sc.post(tr.payload, channel=tr.target.slack.channel)
+                    posted_any = True
+                except Exception as exc:
+                    msg = (
+                        f"Failed to post digest for team {tr.target.team!r} "
+                        f"to channel {tr.target.slack.channel!r}: {exc}"
+                    )
+                    raise RuntimeError(msg) from exc
+        finally:
+            if own_slack:
+                sc.close()
+
+    if cfg.email.enabled:
+        ec = email_client or EmailClient(cfg.email)
+        tiers = cfg.digest.tiers or None
         for tr in target_results:
+            if tr.target.email is None:
+                continue
+            subject = f"rootcoz weekly digest — {window.label} — {tr.target.team}"
+            if tr.rows:
+                html = format_digest_html(
+                    window=window,
+                    rows=tr.rows,
+                    team=tr.target.team,
+                    tiers=tiers,
+                )
+            else:
+                html = format_celebration_html(
+                    window=window,
+                    team=tr.target.team,
+                    total_jobs=tr.total_jobs,
+                    tiers=tiers,
+                )
             logger.info(
-                "Posting digest to channel %s (team %s)",
-                tr.target.channel,
+                "Sending digest email for team %s to %s",
                 tr.target.team,
+                ", ".join(tr.target.email.recipients),
             )
             try:
-                sc.post(tr.payload, channel=tr.target.channel)
+                ec.send(
+                    recipients=tr.target.email.recipients,
+                    cc=tr.target.email.cc,
+                    subject=subject,
+                    html_body=html,
+                )
+                posted_any = True
             except Exception as exc:
                 msg = (
-                    f"Failed to post digest for team {tr.target.team!r} "
-                    f"to channel {tr.target.channel!r}: {exc}"
+                    f"Failed to send digest email for team {tr.target.team!r} "
+                    f"to {tr.target.email.recipients!r}: {exc}"
                 )
                 raise RuntimeError(msg) from exc
-    finally:
-        if own_slack:
-            sc.close()
+
     return DigestResult(
         target_results=target_results,
         all_rows=all_rows,
-        posted=True,
+        posted=posted_any,
     )
 
 
@@ -342,8 +417,8 @@ __all__ = [
     "DigestResult",
     "RootcozConfig",
     "SlackConfig",
-    "SlackTarget",
     "StaticUsergroupResolver",
+    "Target",
     "TargetResult",
     "apply_env_overrides",
     "render_blocks_json",

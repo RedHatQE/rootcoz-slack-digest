@@ -64,7 +64,9 @@ def run_cmd(
             typer.echo("(no matching targets to render)")
             return
         for tr in result.target_results:
-            typer.echo(f"# team={tr.target.team} channel={tr.target.channel}")
+            channel = tr.target.slack.channel if tr.target.slack else "-"
+            email = ",".join(tr.target.email.recipients) if tr.target.email else "-"
+            typer.echo(f"# team={tr.target.team} channel={channel} email={email}")
             typer.echo(render_payload(tr.payload))
     else:
         if result.posted:

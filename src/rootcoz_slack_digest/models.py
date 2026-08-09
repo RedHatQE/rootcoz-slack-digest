@@ -214,14 +214,51 @@ class SlackConfig(BaseModel):
     bot_token: str = ""
 
 
-class SlackTarget(BaseModel):
-    """One team→channel→usergroup routing entry from SLACK_TARGETS."""
+class SlackTargetConfig(BaseModel):
+    """Slack delivery config for a target."""
+
+    model_config = ConfigDict(frozen=True)
+
+    channel: str
+    usergroup: str = ""
+
+
+class EmailTargetConfig(BaseModel):
+    """Email delivery config for a target."""
+
+    model_config = ConfigDict(frozen=True)
+
+    recipients: list[str]
+    cc: list[str] = Field(default_factory=list)
+
+
+class Target(BaseModel):
+    """One team routing entry with optional Slack and email delivery."""
 
     model_config = ConfigDict(frozen=True)
 
     team: str
-    channel: str
-    usergroup: str = ""
+    slack: SlackTargetConfig | None = None
+    email: EmailTargetConfig | None = None
+
+    @model_validator(mode="after")
+    def _require_delivery(self) -> Target:
+        if self.slack is None and self.email is None:
+            msg = f"Target for team {self.team!r} must have slack and/or email"
+            raise ValueError(msg)
+        return self
+
+
+class EmailConfig(BaseModel):
+    """SMTP email settings."""
+
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = False
+    smtp_host: str = "smtp.example.com"
+    smtp_port: int = 25
+    from_address: str = "rootcoz-digest@redhat.com"
+    use_tls: bool = False
 
 
 class AppConfig(BaseModel):
@@ -234,6 +271,7 @@ class AppConfig(BaseModel):
     message: MessageConfig = Field(default_factory=MessageConfig)
     rootcoz: RootcozConfig = Field(default_factory=RootcozConfig)
     slack: SlackConfig = Field(default_factory=SlackConfig)
+    email: EmailConfig = Field(default_factory=EmailConfig)
 
 
 def load_config(path: Path | None) -> AppConfig:

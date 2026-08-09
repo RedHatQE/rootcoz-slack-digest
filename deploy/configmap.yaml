@@ -54,10 +54,25 @@ data:
 
     [slack]
     mode = "bot"
+
+    [email]
+    enabled = false
+    smtp_host = "smtp.example.com"
+    smtp_port = 25
+    from_address = "rootcoz-digest@redhat.com"
+    use_tls = false
   ROOTCOZ_URL: "REPLACE"
   ROOTCOZ_VERIFY_SSL: "true"
-  SLACK_TARGETS: |
+  TARGETS: |
     [
-      {"team": "virt-node", "channel": "REPLACE", "usergroup": "virt-node-qe"},
-      {"team": "network", "channel": "REPLACE", "usergroup": "network-qe"}
+      {
+        "team": "virt-node",
+        "slack": {"channel": "REPLACE", "usergroup": "virt-node-qe"},
+        "email": {"recipients": ["REPLACE@redhat.com"]}
+      },
+      {
+        "team": "network",
+        "slack": {"channel": "REPLACE", "usergroup": "network-qe"},
+        "email": {"recipients": ["REPLACE@redhat.com"]}
+      }
     ]

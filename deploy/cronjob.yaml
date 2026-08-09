@@ -45,11 +45,11 @@ spec:
                     configMapKeyRef:
                       name: rootcoz-slack-digest-config
                       key: ROOTCOZ_VERIFY_SSL
-                - name: SLACK_TARGETS
+                - name: TARGETS
                   valueFrom:
                     configMapKeyRef:
                       name: rootcoz-slack-digest-config
-                      key: SLACK_TARGETS
+                      key: TARGETS
               envFrom:
                 - secretRef:
                     name: rootcoz-slack-digest-credentials

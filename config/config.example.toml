@@ -1,5 +1,5 @@
 # Copy to config.toml (gitignored) or mount as ConfigMap in-cluster.
-# Secrets (credentials) come from K8s Secret; non-secret env (ROOTCOZ_URL, ROOTCOZ_VERIFY_SSL, SLACK_TARGETS) from ConfigMap.
+# Secrets (credentials) come from K8s Secret; non-secret env (ROOTCOZ_URL, ROOTCOZ_VERIFY_SSL, TARGETS) from ConfigMap.
 # Message data is always loaded from the rootcoz API — no HTML report URLs.
 
 [schedule]
@@ -13,7 +13,7 @@ timezone = "UTC"
 # 0 = no limit (show all jobs). Positive N truncates the Slack message.
 max_rows = 0
 sort_by = "not_reviewed" # not_reviewed | failures | job_name
-# Passed as API ``label`` query params (server-side). One API call per SLACK_TARGETS team.
+# Passed as API ``label`` query params (server-side). One API call per TARGETS team.
 tiers = ["gating", "release-checklist", "other"]
 # Column order controls the Slack table (API fields only).
 columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
@@ -76,9 +76,18 @@ release-checklist = "release-checklist"
 [slack]
 # Prefer bot mode for usergroup mentions (<!subteam^ID>).
 # Prefer env: SLACK_BOT_TOKEN, SLACK_WEBHOOK_URL
-# Team → channel routing comes from SLACK_TARGETS env / ConfigMap (JSON):
-#   [{"team": "virt-node", "channel": "C...", "usergroup": "virt-node-qe"}]
-# Note: webhook mode supports at most one SLACK_TARGETS entry; use bot mode for multi-target routing.
+# Team routing comes from TARGETS env / ConfigMap (JSON):
+#   [{"team": "virt-node", "slack": {"channel": "C...", "usergroup": "virt-node-qe"},
+#     "email": {"recipients": ["team@redhat.com"], "cc": []}}]
+# Note: webhook mode supports at most one TARGETS entry with slack; use bot mode for multi-target routing.
 mode = "bot"
 bot_token = ""
 webhook_url = ""
+
+[email]
+# SMTP relay (no auth). Enable to deliver digests via TARGETS[].email.
+enabled = false
+smtp_host = "smtp.example.com"
+smtp_port = 25
+from_address = "rootcoz-digest@redhat.com"
+use_tls = false

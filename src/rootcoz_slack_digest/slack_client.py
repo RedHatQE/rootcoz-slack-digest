@@ -76,7 +76,7 @@ class SlackClient:
             raise ValueError(msg)
         ch = channel or ""
         if not ch:
-            msg = "channel is required for bot mode (pass channel from SLACK_TARGETS)"
+            msg = "channel is required for bot mode (pass channel from TARGETS)"
             raise ValueError(msg)
         payload: dict[str, Any] = {
             "channel": ch,
