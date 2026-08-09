@@ -76,9 +76,16 @@ def test_build_message_blocks_no_html_summary() -> None:
     assert "HTML summary" not in blob
     assert "rootcause-summary" not in blob
     assert "```" not in blob
+    tables = [b for b in payload if b.get("type") == "table"]
+    assert tables
     assert "*gating*" in blob
-    assert "<https://jenkins.example/job/" in blob
-    assert "|rootcoz>" in blob
+    assert "https://jenkins.example/job/" in blob
+    # rootcoz column uses rich_text link with label "view"
+    rootcoz_cells = [row[3] for table in tables for row in table["rows"][1:]]
+    assert any(
+        cell.get("type") == "rich_text" and cell["elements"][0]["elements"][0].get("text") == "view"
+        for cell in rootcoz_cells
+    )
     assert "+3 more" in blob
 
 
@@ -183,26 +190,20 @@ def test_plain_format_is_string() -> None:
     assert "HTML" not in payload
 
 
-def test_build_message_splits_long_body() -> None:
-    """Body over 2900 chars becomes multiple section blocks under the limit."""
+def test_build_message_blocks_use_table() -> None:
+    """BLOCKS format uses native table blocks (one per tier) instead of text sections."""
     window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
     rows = [
-        _row(
-            f"very-long-job-name-{i:03d}-padding-xxxxxxxxxxxxxxxxxxxx",
-            2,
-            0,
-            tier="gating" if i < 40 else "other",
-        )
-        for i in range(80)
+        _row("gate-a", 2, 0, tier="gating", bundle="v4.22.6.rhel9-9"),
+        _row("other-a", 3, 0, tier="other", bundle="v5.0.0.rhel9-9"),
     ]
     payload = build_message(
         window=window,
         rows=rows,
-        max_rows=80,
+        max_rows=10,
         sort_by=SortBy.JOB_NAME,
         columns=[
             DigestColumn.JOB_NAME,
-            DigestColumn.TIER,
             DigestColumn.FAILURES,
             DigestColumn.REVIEWED,
             DigestColumn.JENKINS,
@@ -212,13 +213,28 @@ def test_build_message_splits_long_body() -> None:
     )
     assert isinstance(payload, list)
     types = [b.get("type") for b in payload]
-    divider_idx = types.index("divider")
-    body_sections = [b for b in payload[divider_idx + 1 :] if b.get("type") == "section"]
-    assert len(body_sections) > 1
-    for section in body_sections:
-        text = section["text"]["text"]
-        assert isinstance(text, str)
-        assert len(text) <= 2900
+    assert types[:3] == ["section", "section", "divider"]
+    tables = [b for b in payload if b.get("type") == "table"]
+    assert len(tables) == 2
+    # Tier headers between divider and tables when multiple tiers
+    assert "*gating*" in str(payload)
+    assert "*other*" in str(payload)
+    gate_table = tables[0]
+    assert gate_table["column_settings"][0] == {"is_wrapped": True}
+    assert gate_table["column_settings"][2] == {"align": "right"}
+    header = gate_table["rows"][0]
+    assert [c["text"] for c in header] == ["Job", "Bundle", "Reviewed", "rootcoz"]
+    job_cell = gate_table["rows"][1][0]
+    assert job_cell["type"] == "rich_text"
+    link = job_cell["elements"][0]["elements"][0]
+    assert link["type"] == "link"
+    assert link["url"] == "https://jenkins.example/job/gate-a/1/"
+    assert link["text"] == "gate-a"
+    assert gate_table["rows"][1][1]["text"] == "v4.22.6.rhel9-9"
+    assert gate_table["rows"][1][2]["text"] == "0/2"
+    rootcoz_link = gate_table["rows"][1][3]["elements"][0]["elements"][0]
+    assert rootcoz_link["url"] == "https://rootcoz.example/results/gate-a"
+    assert rootcoz_link["text"] == "view"
 
 
 def test_build_message_includes_lanes_in_header() -> None:

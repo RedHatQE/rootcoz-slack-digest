@@ -189,6 +189,97 @@ def _format_grouped_by_tier(rows: list[JobRow]) -> str:
     return "\n\n".join(sections)
 
 
+def _link_cell(url: str, text: str) -> dict[str, object]:
+    """Build a rich_text table cell with a single link."""
+    return {
+        "type": "rich_text",
+        "elements": [
+            {
+                "type": "rich_text_section",
+                "elements": [{"type": "link", "url": url, "text": text}],
+            }
+        ],
+    }
+
+
+def _build_table_blocks(rows: list[JobRow]) -> list[dict[str, object]]:
+    """Build Slack table blocks grouped by tier with links."""
+    groups: dict[str, list[JobRow]] = {}
+    for row in rows:
+        groups.setdefault(row.tier, []).append(row)
+
+    sorted_tiers = sorted(
+        groups.keys(),
+        key=lambda t: (_TIER_ORDER.get(t, 99), t),
+    )
+
+    blocks: list[dict[str, object]] = []
+    show_tier_header = len(sorted_tiers) > 1
+
+    for tier in sorted_tiers:
+        tier_rows = sorted(
+            groups[tier],
+            key=lambda r: (
+                _version_sort_key(r.version),
+                _version_sort_key(r.bundle.lstrip("v")),
+                r.failure_count,
+            ),
+            reverse=True,
+        )
+
+        if show_tier_header:
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": f"*{tier}*"},
+                }
+            )
+
+        header_row: list[dict[str, object]] = [
+            {"type": "raw_text", "text": "Job"},
+            {"type": "raw_text", "text": "Bundle"},
+            {"type": "raw_text", "text": "Reviewed"},
+            {"type": "raw_text", "text": "rootcoz"},
+        ]
+
+        data_rows: list[list[dict[str, object]]] = []
+        for row in tier_rows:
+            if row.jenkins_url:
+                job_cell: dict[str, object] = _link_cell(row.jenkins_url, row.job_name)
+            else:
+                job_cell = {"type": "raw_text", "text": row.job_name}
+
+            bundle_cell: dict[str, object] = {
+                "type": "raw_text",
+                "text": row.bundle or "-",
+            }
+            reviewed_cell: dict[str, object] = {
+                "type": "raw_text",
+                "text": f"{row.reviewed_count}/{row.failure_count}",
+            }
+            if row.rootcoz_url:
+                rootcoz_cell: dict[str, object] = _link_cell(row.rootcoz_url, "view")
+            else:
+                rootcoz_cell = {"type": "raw_text", "text": "-"}
+
+            data_rows.append([job_cell, bundle_cell, reviewed_cell, rootcoz_cell])
+
+        blocks.append(
+            {
+                "type": "table",
+                "column_settings": [
+                    {"is_wrapped": True},
+                    {},
+                    {"align": "right"},
+                    {},
+                ],
+                "rows": [header_row, *data_rows],
+            }
+        )
+
+    return blocks
+
+
 def _format_column_table(
     rows: list[JobRow],
     columns: list[DigestColumn],
@@ -243,95 +334,6 @@ def _safe_format(template: str, template_name: str, **kwargs: object) -> str:
         raise ValueError(msg) from exc
 
 
-def _split_blocks(
-    text: str, block_type: str = "section", max_chars: int = 2900
-) -> list[dict[str, object]]:
-    """Split long text into multiple Slack blocks at tier-group boundaries."""
-    if len(text) <= max_chars:
-        return [{"type": block_type, "text": {"type": "mrkdwn", "text": text}}]
-
-    # Prefer splitting between tier groups (double-newline separated)
-    if "\n\n" in text:
-        groups = text.split("\n\n")
-        blocks: list[dict[str, object]] = []
-        chunk_parts: list[str] = []
-        chunk_len = 0
-
-        for group in groups:
-            if len(group) > max_chars:
-                if chunk_parts:
-                    blocks.append(
-                        {
-                            "type": block_type,
-                            "text": {"type": "mrkdwn", "text": "\n\n".join(chunk_parts)},
-                        }
-                    )
-                    chunk_parts = []
-                    chunk_len = 0
-                blocks.extend(_split_by_lines(group, block_type, max_chars))
-                continue
-
-            sep = 2 if chunk_parts else 0
-            if chunk_parts and chunk_len + sep + len(group) > max_chars:
-                blocks.append(
-                    {
-                        "type": block_type,
-                        "text": {"type": "mrkdwn", "text": "\n\n".join(chunk_parts)},
-                    }
-                )
-                chunk_parts = [group]
-                chunk_len = len(group)
-            else:
-                chunk_len += sep + len(group)
-                chunk_parts.append(group)
-
-        if chunk_parts:
-            blocks.append(
-                {
-                    "type": block_type,
-                    "text": {"type": "mrkdwn", "text": "\n\n".join(chunk_parts)},
-                }
-            )
-        return blocks
-
-    return _split_by_lines(text, block_type, max_chars)
-
-
-def _split_by_lines(text: str, block_type: str, max_chars: int) -> list[dict[str, object]]:
-    """Split text by line boundaries."""
-    if len(text) <= max_chars:
-        return [{"type": block_type, "text": {"type": "mrkdwn", "text": text}}]
-
-    blocks: list[dict[str, object]] = []
-    lines = text.split("\n")
-    chunk: list[str] = []
-    chunk_len = 0
-
-    for line in lines:
-        line_len = len(line) + 1
-        if chunk and chunk_len + line_len > max_chars:
-            blocks.append(
-                {
-                    "type": block_type,
-                    "text": {"type": "mrkdwn", "text": "\n".join(chunk)},
-                }
-            )
-            chunk = []
-            chunk_len = 0
-        chunk.append(line)
-        chunk_len += line_len
-
-    if chunk:
-        blocks.append(
-            {
-                "type": block_type,
-                "text": {"type": "mrkdwn", "text": "\n".join(chunk)},
-            }
-        )
-
-    return blocks
-
-
 def build_message(
     *,
     window: WeekWindow,
@@ -375,8 +377,6 @@ def build_message(
         total_reviewed=total_reviewed,
         week_label=window.label,
     )
-    mrkdwn = message.format is not MessageFormat.PLAIN
-    body = format_rows_text(shown, columns, message, mrkdwn=mrkdwn)
     omitted_text = ""
     if omitted:
         omitted_text = _safe_format(message.omitted_template, "omitted", omitted=omitted)
@@ -386,8 +386,9 @@ def build_message(
             {"type": "section", "text": {"type": "mrkdwn", "text": header}},
             {"type": "section", "text": {"type": "mrkdwn", "text": totals}},
             {"type": "divider"},
-            *_split_blocks(body),
         ]
+        if shown:
+            blocks.extend(_build_table_blocks(shown))
         if omitted_text:
             blocks.append(
                 {
@@ -397,6 +398,8 @@ def build_message(
             )
         return blocks
 
+    mrkdwn = message.format is not MessageFormat.PLAIN
+    body = format_rows_text(shown, columns, message, mrkdwn=mrkdwn)
     parts = [header, totals, body]
     if omitted_text:
         parts.append(omitted_text)
