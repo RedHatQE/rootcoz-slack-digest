@@ -93,7 +93,7 @@ release-checklist = "release-checklist"
 # Prefer env: SLACK_BOT_TOKEN, SLACK_WEBHOOK_URL
 # Team routing comes from TARGETS env / ConfigMap (JSON):
 #   [{"team": "virt-node", "slack": {"channel": "C...", "usergroup": "virt-node-qe"},
-#     "email": {"recipients": ["team@redhat.com"], "cc": []}}]
+#     "email": {"recipients": ["team@example.com"], "cc": []}}]
 # Note: webhook mode supports at most one TARGETS entry with slack; use bot mode for multi-target routing.
 mode = "bot"
 bot_token = ""

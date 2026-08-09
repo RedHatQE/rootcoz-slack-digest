@@ -73,7 +73,7 @@ Team routing is via `TARGETS`, not `[digest]` config.
 # Team routing via TARGETS env / ConfigMap (JSON):
 #   [{"team": "virt-node",
 #     "slack": {"channel": "C...", "usergroup": "virt-node-qe"},
-#     "email": {"recipients": ["team@redhat.com"], "cc": []}}]
+#     "email": {"recipients": ["team@example.com"], "cc": []}}]
 ```
 
 Each entry posts a team-filtered digest — rows are matched by `row.team == target.team`.
@@ -107,7 +107,7 @@ The CronJob installs the package from the **public** GitHub repo via
   {
     "team": "virt-node",
     "slack": {"channel": "C...", "usergroup": "virt-node-qe"},
-    "email": {"recipients": ["team@redhat.com"]}
+    "email": {"recipients": ["team@example.com"]}
   }
 ]
 ```

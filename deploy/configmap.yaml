@@ -74,11 +74,11 @@ data:
       {
         "team": "virt-node",
         "slack": {"channel": "REPLACE", "usergroup": "virt-node-qe"},
-        "email": {"recipients": ["REPLACE@redhat.com"]}
+        "email": {"recipients": ["REPLACE@example.com"]}
       },
       {
         "team": "network",
         "slack": {"channel": "REPLACE", "usergroup": "network-qe"},
-        "email": {"recipients": ["REPLACE@redhat.com"]}
+        "email": {"recipients": ["REPLACE@example.com"]}
       }
     ]
