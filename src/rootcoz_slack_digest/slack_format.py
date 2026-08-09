@@ -265,19 +265,12 @@ def _build_table_blocks(rows: list[JobRow]) -> list[dict[str, object]]:
             data_rows.append([job_cell, bundle_cell, reviewed_cell, rootcoz_cell])
 
         # data_table: page_size keeps rows expanded (table collapses by default)
+        # caption must be a plain string (not rich_text)
         caption_text = tier if show_tier_header else "Jobs"
         blocks.append(
             {
                 "type": "data_table",
-                "caption": {
-                    "type": "rich_text",
-                    "elements": [
-                        {
-                            "type": "rich_text_section",
-                            "elements": [{"type": "text", "text": caption_text}],
-                        }
-                    ],
-                },
+                "caption": caption_text,
                 "rows": [header_row, *data_rows],
                 "page_size": 100,
                 "row_header_column_index": 0,
