@@ -27,3 +27,4 @@ config/config.toml
 
 # Pi / agent
 .pi/tmp/
+.dev
