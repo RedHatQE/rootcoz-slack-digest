@@ -101,12 +101,14 @@ class DigestConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    max_rows: int = Field(default=25, ge=1)
+    max_rows: int = Field(default=0, ge=0)  # 0 = no limit
     sort_by: SortBy = SortBy.NOT_REVIEWED
+    # Passed as API ``label`` query params (server-side tier filter).
     tiers: list[str] = Field(default_factory=lambda: ["gating", "release-checklist", "other"])
     columns: list[DigestColumn] = Field(default_factory=lambda: list(DEFAULT_COLUMNS))
-    exclude_tags: list[str] = Field(default_factory=list)
+    # Passed as API ``exclude_label`` query params (metadata labels).
     exclude_labels: list[str] = Field(default_factory=list)
+    # Client-side filter: drop jobs whose name contains any of these substrings.
     exclude_job_patterns: list[str] = Field(default_factory=list)
 
     @field_validator("columns", mode="before")

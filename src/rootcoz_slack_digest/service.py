@@ -133,6 +133,7 @@ def run_digest(
     When ``rows`` is provided, rootcoz is not contacted (tests / offline render).
     Message content always comes from API job rows — never from HTML report URLs.
     Each ``SlackTarget`` gets a team-filtered digest posted to its channel.
+    Live runs fetch once per target with server-side team/label filters.
     """
     cfg = apply_env_overrides(config)
     logger.info(
@@ -145,32 +146,11 @@ def run_digest(
     else:
         window = last_complete_week()
 
-    own_rootcoz = False
-    if rows is None:
-        own_rootcoz = rootcoz_client is None
-        client = rootcoz_client or RootcozClient(cfg.rootcoz)
-        try:
-            rows = client.fetch_job_rows(
-                window,
-                exclude_tags=cfg.digest.exclude_tags or None,
-                exclude_labels=cfg.digest.exclude_labels or None,
-                exclude_job_patterns=cfg.digest.exclude_job_patterns or None,
-            )
-        finally:
-            if own_rootcoz:
-                client.close()
-
-    # Filter by configured tiers (if specified)
-    if cfg.digest.tiers:
-        allowed_tiers = set(cfg.digest.tiers)
-        rows = [r for r in rows if r.tier in allowed_tiers]
-        logger.info("After tier filter (%s): %d rows", ", ".join(cfg.digest.tiers), len(rows))
-
     resolved_targets = targets if targets is not None else _load_slack_targets()
     if not resolved_targets:
         if dry_run:
             logger.warning("No SLACK_TARGETS configured; nothing to render")
-            return DigestResult(target_results=[], all_rows=rows, posted=False)
+            return DigestResult(target_results=[], all_rows=rows or [], posted=False)
         msg = "No SLACK_TARGETS configured; cannot post digest"
         raise ValueError(msg)
 
@@ -191,18 +171,40 @@ def run_digest(
         else:
             logger.warning("No bot token; cannot resolve usergroup mentions — posting without CC")
 
+    own_rootcoz = False
+    client: RootcozClient | None = None
+    if rows is None:
+        own_rootcoz = rootcoz_client is None
+        client = rootcoz_client or RootcozClient(cfg.rootcoz)
+
+    all_rows: list[JobRow] = []
     target_results: list[TargetResult] = []
     try:
         for target in resolved_targets:
-            filtered = [r for r in rows if r.team == target.team]
+            if rows is None:
+                assert client is not None
+                target_rows = client.fetch_job_rows(
+                    window,
+                    team=target.team,
+                    labels=cfg.digest.tiers or None,
+                    exclude_labels=cfg.digest.exclude_labels or None,
+                )
+                if cfg.digest.exclude_job_patterns:
+                    patterns = cfg.digest.exclude_job_patterns
+                    target_rows = [
+                        r for r in target_rows if not any(pat in r.job_name for pat in patterns)
+                    ]
+            else:
+                # Test / offline mode: filter injected rows by team
+                target_rows = [r for r in rows if r.team == target.team]
+            all_rows.extend(target_rows)
             logger.info(
-                "Target %s: %d/%d rows matched team %r",
+                "Target %s: %d rows for team %r",
                 target.channel,
-                len(filtered),
-                len(rows),
+                len(target_rows),
                 target.team,
             )
-            if not filtered:
+            if not target_rows:
                 # Team has no unreviewed failures — post celebration
                 mention = ""
                 if cfg.message.include_mentions and target.usergroup and resolver is not None:
@@ -234,38 +236,40 @@ def run_digest(
                 mention = mention_for_handle(resolver, target.usergroup)
             payload = build_message(
                 window=window,
-                rows=filtered,
+                rows=target_rows,
                 max_rows=cfg.digest.max_rows,
                 sort_by=cfg.digest.sort_by,
                 columns=list(cfg.digest.columns),
                 message=cfg.message,
                 mention=mention,
             )
-            target_results.append(TargetResult(target=target, payload=payload, rows=filtered))
+            target_results.append(TargetResult(target=target, payload=payload, rows=target_rows))
     finally:
+        if own_rootcoz and client is not None:
+            client.close()
         if own_resolver and isinstance(resolver, SlackUsergroupResolver):
             resolver.close()
 
     if not target_results:
-        if not rows:
+        if not all_rows:
             # Quiet week — no failures to report. Successful no-op.
             logger.info("No failures in window — nothing to post")
-            return DigestResult(target_results=[], all_rows=rows, posted=False)
+            return DigestResult(target_results=[], all_rows=all_rows, posted=False)
         if dry_run:
             logger.warning("All targets filtered out — no rows matched any team")
-            return DigestResult(target_results=[], all_rows=rows, posted=False)
+            return DigestResult(target_results=[], all_rows=all_rows, posted=False)
         msg = "No target digests generated — no rows matched any SLACK_TARGETS team"
         raise ValueError(msg)
 
     if dry_run:
         logger.info(
             "Dry-run: not posting to Slack (%d jobs, %d targets)",
-            len(rows),
+            len(all_rows),
             len(target_results),
         )
         return DigestResult(
             target_results=target_results,
-            all_rows=rows,
+            all_rows=all_rows,
             posted=False,
         )
 
@@ -291,7 +295,7 @@ def run_digest(
             sc.close()
     return DigestResult(
         target_results=target_results,
-        all_rows=rows,
+        all_rows=all_rows,
         posted=True,
     )
 

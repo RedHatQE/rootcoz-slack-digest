@@ -72,6 +72,23 @@ def test_build_message_blocks_no_html_summary() -> None:
     assert "+3 more" in blob
 
 
+def test_build_message_max_rows_zero_shows_all() -> None:
+    window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
+    rows = [_row(f"job-{i}", i + 1, 0) for i in range(5)]
+    payload = build_message(
+        window=window,
+        rows=rows,
+        max_rows=0,
+        sort_by=SortBy.NOT_REVIEWED,
+        columns=[DigestColumn.JOB_NAME, DigestColumn.FAILURES],
+        message=MessageConfig(format=MessageFormat.MRKDWN),
+    )
+    assert isinstance(payload, str)
+    assert "more jobs not shown" not in payload
+    for row in rows:
+        assert row.job_name in payload
+
+
 def test_grouped_by_tier_order_and_links() -> None:
     window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
     rows = [

@@ -13,13 +13,12 @@ data:
     timezone = "UTC"
 
     [digest]
-    max_rows = 25
+    # 0 = no limit. tiers / exclude_labels are API query params; exclude_job_patterns is client-side name filter.
+    max_rows = 0
     sort_by = "not_reviewed"
     tiers = ["gating", "release-checklist", "other"]
     columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
-    exclude_tags = ["s390x"]
-    exclude_labels = []
-    # Exclude jobs whose name contains these substrings.
+    exclude_labels = ["s390x"]
     exclude_job_patterns = ["s390x"]
 
     [message]

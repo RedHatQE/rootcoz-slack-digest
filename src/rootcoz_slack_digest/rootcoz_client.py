@@ -52,15 +52,24 @@ class RootcozClient:
         self,
         window: WeekWindow,
         *,
-        exclude_tags: list[str] | None = None,
+        team: str = "",
+        labels: list[str] | None = None,
         exclude_labels: list[str] | None = None,
-        exclude_job_patterns: list[str] | None = None,
     ) -> list[JobRow]:
-        """Fetch jobs using configured endpoint, params, and field mapping."""
+        """Fetch jobs with server-side filtering via API query params."""
         fm = self._config.field_map
-        params = dict(self._config.params)
-        params["from"] = window.date_from.isoformat()
-        params["to"] = window.date_to.isoformat()
+        # Use a list of pairs so repeated keys (label, exclude_label) are preserved.
+        params: list[tuple[str, str]] = [(k, str(v)) for k, v in self._config.params.items()]
+        params.append(("date_from", window.date_from.isoformat()))
+        params.append(("date_to", window.date_to.isoformat()))
+        if team:
+            params.append(("team", team))
+        if labels:
+            for label in labels:
+                params.append(("label", label))
+        if exclude_labels:
+            for el in exclude_labels:
+                params.append(("exclude_label", el))
 
         resp = self._client.get(self._config.endpoint, params=params)
         resp.raise_for_status()
@@ -75,7 +84,7 @@ class RootcozClient:
                 continue
             job_id = str(resolve_path(job, fm.job_id) or "")
             job_name = str(resolve_path(job, fm.job_name) or job_id)
-            team = str(resolve_path(job, fm.team) or "")
+            team_val = str(resolve_path(job, fm.team) or "")
 
             tier_raw = resolve_path(job, fm.tier)
             tier = extract_tier(tier_raw, self._config.tier_labels.labels)
@@ -83,7 +92,7 @@ class RootcozClient:
             build_raw = resolve_path(job, fm.build)
             try:
                 build_int = int(build_raw) if build_raw is not None else None
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 build_int = None
 
             failures = int(resolve_path(job, fm.failures) or 0)
@@ -106,27 +115,12 @@ class RootcozClient:
             else:
                 rootcoz_url = str(resolve_path(job, fm.rootcoz) or "")
 
-            # Check job name exclusions
-            if exclude_job_patterns and any(pat in job_name for pat in exclude_job_patterns):
-                continue
-
-            metadata = job.get("metadata") if isinstance(job.get("metadata"), dict) else {}
-            job_tags = [str(t) for t in (job.get("tags") or [])]
-            job_labels = [str(lb) for lb in (metadata.get("labels") or [])]
-
-            if exclude_tags and any(pat in tag for pat in exclude_tags for tag in job_tags):
-                continue
-            if exclude_labels and any(
-                pat in label for pat in exclude_labels for label in job_labels
-            ):
-                continue
-
             rows.append(
                 JobRow(
                     job_id=job_id,
                     job_name=job_name,
                     tier=tier,
-                    team=team,
+                    team=team_val,
                     failure_count=failures,
                     reviewed_count=reviewed,
                     build_number=build_int,
@@ -135,5 +129,11 @@ class RootcozClient:
                     created_at=created_at,
                 )
             )
-        logger.info("Fetched %d jobs from rootcoz (%s)", len(rows), self._config.endpoint)
+        logger.info(
+            "Fetched %d jobs from rootcoz (%s) team=%r labels=%s",
+            len(rows),
+            self._config.endpoint,
+            team,
+            labels,
+        )
         return rows

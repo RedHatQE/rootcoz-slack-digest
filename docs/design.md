@@ -25,7 +25,7 @@ No HTML summary URLs. A week with no failing jobs is a successful no-op — noth
 
 - **Week window:** last complete Mon–Sun in UTC (computed by `week.py`)
 - **Rootcoz API:** `GET /api/dashboard/filtered` with `Authorization: Bearer <api_key>`,
-  `from` date, `review_status=not_reviewed`, and `limit=0`
+  `date_from`/`date_to`, `review_status=not_reviewed`, and `limit=0`
 - **Job links:** rootcoz `/results/{job_id}`; Jenkins URLs from the API response
   (`jenkins_url` / `build_url`)
 - **Routing:** `SLACK_TARGETS` JSON maps each team to a Slack channel + usergroup mention

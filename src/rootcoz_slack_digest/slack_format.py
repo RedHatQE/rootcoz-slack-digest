@@ -316,12 +316,11 @@ def build_message(
 
     Returns Block Kit list for ``blocks`` format, otherwise a string.
     """
-    max_rows = max(max_rows, 1)
     ordered = sort_rows(rows, sort_by)
     total_failures = sum(r.failure_count for r in ordered)
     total_reviewed = sum(r.reviewed_count for r in ordered)
     total_jobs = len(ordered)
-    shown = ordered[:max_rows]
+    shown = ordered[:max_rows] if max_rows > 0 else ordered
     omitted = max(len(ordered) - len(shown), 0)
 
     mention_suffix = ""
