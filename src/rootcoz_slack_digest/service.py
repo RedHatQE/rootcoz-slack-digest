@@ -74,15 +74,15 @@ def apply_env_overrides(config: AppConfig) -> AppConfig:
     """Overlay standard env vars onto config (secrets + URLs)."""
     rootcoz = config.rootcoz.model_copy(
         update={
-            "url": os.environ.get("ROOTCOZ_URL", config.rootcoz.url),
-            "api_key": os.environ.get("ROOTCOZ_API_KEY", config.rootcoz.api_key),
+            "url": os.environ.get("ROOTCOZ_URL", config.rootcoz.url).strip(),
+            "api_key": os.environ.get("ROOTCOZ_API_KEY", config.rootcoz.api_key).strip(),
             "verify_ssl": _env_bool("ROOTCOZ_VERIFY_SSL", config.rootcoz.verify_ssl),
         }
     )
     slack = config.slack.model_copy(
         update={
-            "webhook_url": os.environ.get("SLACK_WEBHOOK_URL", config.slack.webhook_url),
-            "bot_token": os.environ.get("SLACK_BOT_TOKEN", config.slack.bot_token),
+            "webhook_url": os.environ.get("SLACK_WEBHOOK_URL", config.slack.webhook_url).strip(),
+            "bot_token": os.environ.get("SLACK_BOT_TOKEN", config.slack.bot_token).strip(),
         }
     )
     return config.model_copy(update={"rootcoz": rootcoz, "slack": slack})
