@@ -12,8 +12,6 @@ timezone = "UTC"
 max_rows = 25
 sort_by = "not_reviewed" # not_reviewed | failures | job_name
 tiers = ["gating", "release-checklist", "other"]
-# Empty teams = no team filter (all jobs matching tiers/window).
-teams = []
 # Column order controls the Slack table (API fields only).
 columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
 # Optional columns: team, not_reviewed, build
@@ -33,11 +31,37 @@ omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
 table_code_fence = true
 
 [rootcoz]
-# Prefer env: ROOTCOZ_URL, ROOTCOZ_USERNAME, ROOTCOZ_API_KEY, ROOTCOZ_VERIFY_SSL
+# Prefer env: ROOTCOZ_URL, ROOTCOZ_API_KEY, ROOTCOZ_VERIFY_SSL
 url = ""
-username = ""
 api_key = ""
 verify_ssl = true
+# API endpoint and default query params
+endpoint = "/api/dashboard/filtered"
+
+[rootcoz.params]
+review_status = "not_reviewed"
+limit = "0"
+
+# Map logical field names → JSON dot-paths in the API response.
+# Use dot notation for nested fields (e.g., "metadata.team").
+# Use {placeholder} templates for constructed URLs.
+[rootcoz.field_map]
+job_id = "job_id"
+job_name = "job_name"
+team = "metadata.team"
+tier = "metadata.labels"
+failures = "failure_count"
+reviewed = "reviewed_count"
+build = "build_number"
+jenkins = "jenkins_url"
+rootcoz = "{url}/results/{job_id}"
+
+# Map API label values → display tier names.
+# When tier field is a list, first matching label wins.
+# Unmatched values default to "other".
+[rootcoz.tier_labels]
+gating = "gating"
+release-checklist = "release-checklist"
 
 [slack]
 # Prefer bot mode for usergroup mentions (<!subteam^ID>).

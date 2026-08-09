@@ -16,7 +16,7 @@ Mon–Sun week and post a Slack message (job, tier, failures, reviewed, links).
 ## Data path (mandatory)
 
 ```text
-login → GET /api/reports/totals (+ metadata) → format message → Slack
+Bearer auth → GET /api/dashboard/filtered → format message → Slack
 ```
 
 No HTML summary URLs. A week with no failing jobs is a successful no-op — nothing is posted to Slack.
@@ -24,8 +24,10 @@ No HTML summary URLs. A week with no failing jobs is a successful no-op — noth
 ## Data Flow
 
 - **Week window:** last complete Mon–Sun in UTC (computed by `week.py`)
-- **Rootcoz API:** `GET /api/reports/totals` with date range + optional team/tier filters
-- **Job links:** rootcoz `/results/{job_id}`; Jenkins via `JENKINS_URL` env + job path
+- **Rootcoz API:** `GET /api/dashboard/filtered` with `Authorization: Bearer <api_key>`,
+  `from` date, `review_status=not_reviewed`, and `limit=0`
+- **Job links:** rootcoz `/results/{job_id}`; Jenkins URLs from the API response
+  (`jenkins_url` / `build_url`)
 - **Routing:** `SLACK_TARGETS` JSON maps each team to a Slack channel + usergroup mention
 
 ## Configurability

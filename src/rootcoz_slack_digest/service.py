@@ -75,7 +75,6 @@ def apply_env_overrides(config: AppConfig) -> AppConfig:
     rootcoz = config.rootcoz.model_copy(
         update={
             "url": os.environ.get("ROOTCOZ_URL", config.rootcoz.url),
-            "username": os.environ.get("ROOTCOZ_USERNAME", config.rootcoz.username),
             "api_key": os.environ.get("ROOTCOZ_API_KEY", config.rootcoz.api_key),
             "verify_ssl": _env_bool("ROOTCOZ_VERIFY_SSL", config.rootcoz.verify_ssl),
         }
@@ -148,18 +147,9 @@ def run_digest(
     own_rootcoz = False
     if rows is None:
         own_rootcoz = rootcoz_client is None
-        client = rootcoz_client or RootcozClient(
-            cfg.rootcoz,
-            jenkins_base_url=os.environ.get("JENKINS_URL", ""),
-        )
+        client = rootcoz_client or RootcozClient(cfg.rootcoz)
         try:
-            if rootcoz_client is None:
-                client.login()
-            rows = client.fetch_job_rows(
-                window,
-                teams=cfg.digest.teams or None,
-                tiers=cfg.digest.tiers or None,
-            )
+            rows = client.fetch_job_rows(window)
         finally:
             if own_rootcoz:
                 client.close()

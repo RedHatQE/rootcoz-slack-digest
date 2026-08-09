@@ -15,7 +15,7 @@ Always query the **rootcoz API** before posting. Never depend on HTML summary UR
 
 ## Conventions
 
-- Python ≥ 3.12, managed with `uv`
+- Python ≥ 3.14, managed with `uv`
 - Ruff lint + format; pre-commit required
 - Builtin types only (`list`, `dict` — not `List`/`Dict`)
 - Frozen Pydantic models for config and rows
@@ -29,6 +29,9 @@ Always query the **rootcoz API** before posting. Never depend on HTML summary UR
 uv sync --group dev
 uv run ruff check src tests
 uv run pytest
+tox           # run all: lint + tests
+tox -e lint   # lint only
+tox -e tests  # tests only
 uv run rootcoz-slack-digest run --config config/config.toml --dry-run
 ```
 

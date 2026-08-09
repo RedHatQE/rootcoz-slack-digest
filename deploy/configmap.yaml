@@ -15,7 +15,6 @@ data:
     max_rows = 25
     sort_by = "not_reviewed"
     tiers = ["gating", "release-checklist", "other"]
-    teams = []
     columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
 
     [message]
@@ -25,6 +24,28 @@ data:
     totals_template = "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}*"
     omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
     table_code_fence = true
+
+    [rootcoz]
+    endpoint = "/api/dashboard/filtered"
+
+    [rootcoz.params]
+    review_status = "not_reviewed"
+    limit = "0"
+
+    [rootcoz.field_map]
+    job_id = "job_id"
+    job_name = "job_name"
+    team = "metadata.team"
+    tier = "metadata.labels"
+    failures = "failure_count"
+    reviewed = "reviewed_count"
+    build = "build_number"
+    jenkins = "jenkins_url"
+    rootcoz = "{url}/results/{job_id}"
+
+    [rootcoz.tier_labels]
+    gating = "gating"
+    release-checklist = "release-checklist"
 
     [slack]
     mode = "bot"

@@ -3,8 +3,9 @@
 Slack digest of [rootcoz](https://github.com/myk-org/rootcoz) failures and review
 progress for CNV QE teams.
 
-**Data source:** rootcoz HTTP API only (`/api/reports/totals` + job metadata).
-This tool does **not** use or link to HTML coverage/rootcause summary pages.
+**Data source:** rootcoz HTTP API only (`GET /api/dashboard/filtered` with Bearer
+auth). This tool does **not** use or link to HTML coverage/rootcause summary pages.
+Jenkins and rootcoz result URLs come from the API response (no `JENKINS_URL` env).
 
 On a configurable schedule (or on demand via CLI), it queries rootcoz for a date
 window (default: last complete Mon–Sun), formats a configurable table (job, tier,
@@ -18,7 +19,7 @@ git clone git@github.com:REPLACE_ORG/rootcoz-slack-digest.git
 cd rootcoz-slack-digest
 uv sync --group dev
 cp config/config.example.toml config/config.toml
-# set ROOTCOZ_URL, ROOTCOZ_USERNAME, ROOTCOZ_API_KEY, SLACK_BOT_TOKEN, SLACK_TARGETS
+# set ROOTCOZ_URL, ROOTCOZ_API_KEY, SLACK_BOT_TOKEN, SLACK_TARGETS
 uv run rootcoz-slack-digest run --config config/config.toml --dry-run
 ```
 
@@ -53,8 +54,8 @@ format = "blocks"           # blocks | mrkdwn | plain
 header_template = "*rootcoz digest* — {week_label}{mention_suffix}"
 ```
 
-See `config/config.example.toml` for all keys (columns, message templates, tiers,
-teams).
+See `config/config.example.toml` for all keys (columns, message templates, tiers).
+Team routing is via `SLACK_TARGETS`, not `[digest]` config.
 
 ## Mentions (no people lists in git)
 
@@ -81,7 +82,7 @@ The CronJob installs the package from the **public** GitHub repo via
 | Source | Keys |
 |--------|------|
 | **ConfigMap** | `ROOTCOZ_URL`, `ROOTCOZ_VERIFY_SSL`, `SLACK_TARGETS` (JSON array, **mandatory** for posting) |
-| **Secret** | `ROOTCOZ_USERNAME`, `ROOTCOZ_API_KEY`, `SLACK_BOT_TOKEN`, `JENKINS_URL` |
+| **Secret** | `ROOTCOZ_API_KEY`, `SLACK_BOT_TOKEN` |
 
 `SLACK_TARGETS` format:
 

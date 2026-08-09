@@ -8,7 +8,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class SortBy(StrEnum):
@@ -103,7 +103,6 @@ class DigestConfig(BaseModel):
     max_rows: int = Field(default=25, ge=1)
     sort_by: SortBy = SortBy.NOT_REVIEWED
     tiers: list[str] = Field(default_factory=lambda: ["gating", "release-checklist", "other"])
-    teams: list[str] = Field(default_factory=list)
     columns: list[DigestColumn] = Field(default_factory=lambda: list(DEFAULT_COLUMNS))
 
     @field_validator("columns", mode="before")
@@ -132,15 +131,67 @@ class MessageConfig(BaseModel):
     table_code_fence: bool = True
 
 
+class FieldMapConfig(BaseModel):
+    """Map logical field names → JSON dot-paths in the API response."""
+
+    model_config = ConfigDict(frozen=True)
+
+    job_id: str = "job_id"
+    job_name: str = "job_name"
+    team: str = "metadata.team"
+    tier: str = "metadata.labels"
+    failures: str = "failure_count"
+    reviewed: str = "reviewed_count"
+    build: str = "build_number"
+    jenkins: str = "jenkins_url"
+    rootcoz: str = "{url}/results/{job_id}"
+
+
+class TierLabelsConfig(BaseModel):
+    """Map API label values → display tier names. Unmatched → 'other'."""
+
+    model_config = ConfigDict(frozen=True)
+
+    labels: dict[str, str] = Field(
+        default_factory=lambda: {
+            "gating": "gating",
+            "release-checklist": "release-checklist",
+        }
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_flat_labels(cls, value: Any) -> Any:
+        """Accept flat TOML ``[rootcoz.tier_labels] key = value`` as ``labels``."""
+        if isinstance(value, dict) and "labels" not in value:
+            return {"labels": value}
+        return value
+
+    @field_validator("labels", mode="before")
+    @classmethod
+    def _normalize(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return {"gating": "gating", "release-checklist": "release-checklist"}
+        return value
+
+
 class RootcozConfig(BaseModel):
-    """Rootcoz connection settings (secrets usually from env)."""
+    """Rootcoz connection + API mapping settings."""
 
     model_config = ConfigDict(frozen=True)
 
     url: str = ""
-    username: str = ""
     api_key: str = ""
     verify_ssl: bool = True
+    endpoint: str = "/api/dashboard/filtered"
+    params: dict[str, str] = Field(
+        default_factory=lambda: {
+            "review_status": "not_reviewed",
+            "limit": "0",
+        }
+    )
+    field_map: FieldMapConfig = Field(default_factory=FieldMapConfig)
+    tier_labels: TierLabelsConfig = Field(default_factory=TierLabelsConfig)
 
 
 class SlackConfig(BaseModel):

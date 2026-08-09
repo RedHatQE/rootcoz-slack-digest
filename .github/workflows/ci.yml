@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+      - name: Install tox
+        run: uv tool install tox --with tox-uv
+      - name: Run lint
+        run: tox -e lint
+      - name: Run tests
+        run: tox -e tests
