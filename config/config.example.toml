@@ -28,6 +28,8 @@ columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
 exclude_labels = []
 # Client-side only: exclude jobs whose name contains these substrings.
 exclude_job_patterns = ["s390x"]
+# Exclude jobs with these metadata.version values.
+exclude_versions = ["4.99", "5.99"]
 
 [message]
 format = "blocks" # blocks | mrkdwn | plain

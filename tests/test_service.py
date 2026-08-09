@@ -274,7 +274,7 @@ def test_load_example_has_no_html_summary_url() -> None:
 
     cfg = load_config(Path(__file__).resolve().parents[1] / "config" / "config.example.toml")
     assert "rootcause_summary_url" not in type(cfg.digest).model_fields
-    assert cfg.schedule.cron == "0 7 * * 0"
+    assert cfg.schedule.cron == "0 10 * * 0"
     assert "job_name" in [c.value for c in cfg.digest.columns]
     assert cfg.rootcoz.field_map.team == "metadata.team"
     assert "gating" in cfg.rootcoz.tier_labels.labels

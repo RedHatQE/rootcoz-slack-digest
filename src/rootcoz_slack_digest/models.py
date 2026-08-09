@@ -112,6 +112,8 @@ class DigestConfig(BaseModel):
     exclude_labels: list[str] = Field(default_factory=list)
     # Client-side filter: drop jobs whose name contains any of these substrings.
     exclude_job_patterns: list[str] = Field(default_factory=list)
+    # Client-side filter: drop jobs whose metadata.version is in this list.
+    exclude_versions: list[str] = Field(default_factory=list)
 
     @field_validator("columns", mode="before")
     @classmethod

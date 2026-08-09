@@ -212,6 +212,7 @@ def run_digest(
                     team=target.team,
                     labels=api_labels or None,
                     exclude_labels=cfg.digest.exclude_labels or None,
+                    exclude_versions=cfg.digest.exclude_versions or None,
                 )
                 if cfg.digest.exclude_job_patterns:
                     patterns = cfg.digest.exclude_job_patterns
@@ -239,6 +240,7 @@ def run_digest(
                         team=target.team,
                         labels=api_labels or None,
                         exclude_labels=cfg.digest.exclude_labels or None,
+                        exclude_versions=cfg.digest.exclude_versions or None,
                     )
                     if cfg.digest.exclude_job_patterns:
                         patterns = cfg.digest.exclude_job_patterns
@@ -273,9 +275,7 @@ def run_digest(
                     for job in shown_jobs:
                         bundle_part = f" [{job.bundle}]" if job.bundle else ""
                         if job.rootcoz_url:
-                            link_lines.append(
-                                f"• <{job.rootcoz_url}|{job.job_name}>{bundle_part}"
-                            )
+                            link_lines.append(f"• <{job.rootcoz_url}|{job.job_name}>{bundle_part}")
                         else:
                             link_lines.append(f"• {job.job_name}{bundle_part}")
                     if link_lines:
