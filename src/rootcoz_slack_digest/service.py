@@ -19,6 +19,7 @@ from rootcoz_slack_digest.mentions import (
 from rootcoz_slack_digest.models import (
     AppConfig,
     JobRow,
+    MessageFormat,
     RootcozConfig,
     SlackConfig,
     SlackTarget,
@@ -202,12 +203,31 @@ def run_digest(
                 target.team,
             )
             if not filtered:
-                if rows:
-                    logger.warning(
-                        "Target %s: no rows matched team %r (skipping post)",
-                        target.channel,
-                        target.team,
-                    )
+                # Team has no unreviewed failures — post celebration
+                mention = ""
+                if cfg.message.include_mentions and target.usergroup and resolver is not None:
+                    mention = mention_for_handle(resolver, target.usergroup)
+                mention_suffix = f" — cc {mention}" if mention else ""
+                celebrate_text = (
+                    f"🎉 *rootcoz weekly digest* — {window.label}{mention_suffix}\n\n"
+                    f"✅ All clear for *{target.team}* this week!\n"
+                    "No unreviewed failures — either no failures occurred "
+                    "or all have been reviewed. 🚀"
+                )
+                if cfg.message.format is MessageFormat.BLOCKS:
+                    celebrate_payload: list[dict[str, object]] | str = [
+                        {"type": "section", "text": {"type": "mrkdwn", "text": celebrate_text}},
+                    ]
+                else:
+                    celebrate_payload = celebrate_text
+                target_results.append(
+                    TargetResult(target=target, payload=celebrate_payload, rows=[])
+                )
+                logger.info(
+                    "Target %s: all clear for team %r — celebration message",
+                    target.channel,
+                    target.team,
+                )
                 continue
             mention = ""
             if cfg.message.include_mentions and target.usergroup and resolver is not None:

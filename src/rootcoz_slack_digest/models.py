@@ -79,6 +79,7 @@ class JobRow(BaseModel):
     build_number: int | None = None
     jenkins_url: str = ""
     rootcoz_url: str = ""
+    created_at: str = ""
 
     @property
     def not_reviewed(self) -> int:
@@ -149,6 +150,7 @@ class FieldMapConfig(BaseModel):
     build: str = "build_number"
     jenkins: str = "jenkins_url"
     rootcoz: str = "{url}/results/{job_id}"
+    created_at: str = "created_at"
 
 
 class TierLabelsConfig(BaseModel):

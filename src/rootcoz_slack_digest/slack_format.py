@@ -86,6 +86,8 @@ def _row_template_vars(row: JobRow) -> dict[str, str]:
         "rootcoz_link": rootcoz_link,
         "jenkins_part": f" · {jenkins_link}" if jenkins_link else "",
         "rootcoz_part": f" · {rootcoz_link}" if rootcoz_link else "",
+        "created_at": row.created_at,
+        "date": row.created_at[:10] if row.created_at else "",
     }
 
 
@@ -144,7 +146,9 @@ def _format_grouped_by_tier(rows: list[JobRow]) -> str:
             else:
                 name_part = f"*{row.job_name}*"
 
-            stats = f"fail {row.failure_count} / rev {row.reviewed_count}"
+            date_str = row.created_at[:10] if row.created_at else ""
+            date_part = f" · {date_str}" if date_str else ""
+            stats = f"fail {row.failure_count} / rev {row.reviewed_count}{date_part}"
             parts = [f"• {name_part} — {stats}"]
             if row.rootcoz_url:
                 parts.append(_link("rootcoz", row.rootcoz_url))

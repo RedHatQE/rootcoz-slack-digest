@@ -88,6 +88,7 @@ class RootcozClient:
 
             failures = int(resolve_path(job, fm.failures) or 0)
             reviewed = int(resolve_path(job, fm.reviewed) or 0)
+            created_at = str(resolve_path(job, fm.created_at) or "")
 
             resolved_fields = {
                 "job_id": job_id,
@@ -131,6 +132,7 @@ class RootcozClient:
                     build_number=build_int,
                     jenkins_url=jenkins_url,
                     rootcoz_url=rootcoz_url,
+                    created_at=created_at,
                 )
             )
         logger.info("Fetched %d jobs from rootcoz (%s)", len(rows), self._config.endpoint)
