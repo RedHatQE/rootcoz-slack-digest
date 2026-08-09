@@ -209,7 +209,6 @@ def _build_table_blocks(
     total_jobs: int = 0,
     total_reviewed: int = 0,
     total_failures: int = 0,
-    header: str = "",
 ) -> list[dict[str, object]]:
     """Build Slack table blocks grouped by tier with links."""
     groups: dict[str, list[JobRow]] = {}
@@ -224,7 +223,7 @@ def _build_table_blocks(
     blocks: list[dict[str, object]] = []
     show_tier_header = len(sorted_tiers) > 1
 
-    for i, tier in enumerate(sorted_tiers):
+    for tier in sorted_tiers:
         tier_rows = sorted(
             groups[tier],
             key=lambda r: (
@@ -272,24 +271,17 @@ def _build_table_blocks(
 
             data_rows.append([job_cell, bundle_cell, reviewed_cell, rootcoz_cell])
 
-        # data_table: page_size keeps rows expanded (table collapses by default)
-        # caption must be a plain string (not rich_text)
-        # Caption: header for first table, tier for subsequent multi-tier tables
-        if i == 0 and header:
-            caption_text = header
-        elif show_tier_header:
-            caption_text = tier
-        else:
-            caption_text = " "
-        blocks.append(
-            {
-                "type": "data_table",
-                "caption": caption_text,
-                "rows": [header_row, *data_rows],
-                "page_size": 100,
-                "row_header_column_index": 0,
-            }
-        )
+        table_block: dict[str, object] = {
+            "type": "table",
+            "column_settings": [
+                {"is_wrapped": True},  # Job — wrap long names
+                {},  # Bundle
+                {"align": "right"},  # Reviewed — right-aligned
+                {},  # rootcoz
+            ],
+            "rows": [header_row] + data_rows,
+        }
+        blocks.append(table_block)
 
     return blocks
 
@@ -402,9 +394,21 @@ def build_message(
             total_jobs=total_jobs,
             total_reviewed=total_reviewed,
             total_failures=total_failures,
-            header=header,
         )
-        blocks: list[dict[str, object]] = [*table_blocks]
+
+        blocks: list[dict[str, object]] = []
+
+        # Mention in context block (mrkdwn) so <!subteam^...> renders
+        if message.include_mentions and mention:
+            blocks.append(
+                {
+                    "type": "context",
+                    "elements": [{"type": "mrkdwn", "text": mention}],
+                }
+            )
+
+        blocks.extend(table_blocks)
+
         if omitted_text:
             blocks.append(
                 {
@@ -461,6 +465,11 @@ def blocks_to_fallback_text(blocks: list[dict[str, object]]) -> str:
         caption = block.get("caption")
         if isinstance(caption, str) and caption.strip():
             parts.append(caption)
+        elements = block.get("elements")
+        if isinstance(elements, list):
+            for el in elements:
+                if isinstance(el, dict) and "text" in el:
+                    parts.append(str(el["text"]))
     return "\n".join(parts) if parts else "rootcoz weekly digest"
 
 

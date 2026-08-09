@@ -72,12 +72,16 @@ def test_build_message_blocks_no_html_summary() -> None:
     )
     assert isinstance(payload, list)
     blob = str(payload)
-    assert "cc <!subteam^S1>" in blob
+    # Mention is a context block (mrkdwn)
+    assert payload[0] == {
+        "type": "context",
+        "elements": [{"type": "mrkdwn", "text": "<!subteam^S1>"}],
+    }
+    tables = [b for b in payload if b.get("type") == "table"]
+    assert tables
     assert "HTML summary" not in blob
     assert "rootcause-summary" not in blob
     assert "```" not in blob
-    tables = [b for b in payload if b.get("type") == "data_table"]
-    assert tables
     assert "*gating*" in blob
     assert "https://jenkins.example/job/" in blob
     # rootcoz column uses rich_text link with label "view"
@@ -191,7 +195,7 @@ def test_plain_format_is_string() -> None:
 
 
 def test_build_message_blocks_use_table() -> None:
-    """BLOCKS format uses data_table blocks (one per tier) instead of text sections."""
+    """BLOCKS format uses table blocks (one per tier) instead of text sections."""
     window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
     rows = [
         _row("gate-a", 2, 0, tier="gating", bundle="v4.22.6.rhel9-9"),
@@ -214,18 +218,18 @@ def test_build_message_blocks_use_table() -> None:
     assert isinstance(payload, list)
     types = [b.get("type") for b in payload]
     assert "divider" not in types
-    tables = [b for b in payload if b.get("type") == "data_table"]
+    tables = [b for b in payload if b.get("type") == "table"]
     assert len(tables) == 2
     # Tier headers before tables when multiple tiers
     assert "*gating*" in str(payload)
     assert "*other*" in str(payload)
     gate_table = tables[0]
-    assert gate_table["page_size"] == 100
-    assert gate_table["row_header_column_index"] == 0
-    # Digest title lives in the first table caption (no separate header section)
-    assert "*rootcoz" in str(gate_table["caption"])
-    assert "weekly digest" in str(gate_table["caption"])
-    assert tables[1]["caption"] == "other"
+    assert gate_table["column_settings"] == [
+        {"is_wrapped": True},
+        {},
+        {"align": "right"},
+        {},
+    ]
     header = gate_table["rows"][0]
     assert [c["text"] for c in header] == ["Jobs (2)", "Bundle", "Reviewed (0/5)", "rootcoz"]
     job_cell = gate_table["rows"][1][0]
