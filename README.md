@@ -52,7 +52,7 @@ columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
 
 [message]
 format = "blocks"           # blocks | mrkdwn | plain
-header_template = "*rootcoz digest* — {week_label}{mention_suffix}"
+header_template = "*rootcoz digest* — {week_label}{excluded_versions}{mention_suffix}"
 # Also: celebration_*_template, email_subject_template, totals/row/omitted templates
 
 [rootcoz]
@@ -117,6 +117,17 @@ The CronJob installs the package from the **public** GitHub repo via
    `[schedule].cron` in the ConfigMap (the TOML value is a sync marker only;
    the CronJob schedule is what actually triggers runs)
 3. Manual test: `oc create job --from=cronjob/rootcoz-slack-digest manual-$(date +%s) -n REPLACE_NAMESPACE`
+
+### Staging
+
+Manifests under `deploy/staging/` post to a test Slack channel only
+(`suspend: true` — trigger manually). Reuses the production Secret for
+credentials; apply ConfigMap + CronJob separately from prod.
+
+```bash
+oc apply -f deploy/staging/configmap.yaml -f deploy/staging/cronjob.yaml -n REPLACE_NAMESPACE
+oc create job --from=cronjob/rootcoz-slack-digest-staging staging-$(date +%s) -n REPLACE_NAMESPACE
+```
 
 ## Development
 

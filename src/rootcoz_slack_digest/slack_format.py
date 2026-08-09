@@ -329,6 +329,7 @@ def build_message(
     message: MessageConfig,
     mention: str = "",
     tiers: list[str] | None = None,
+    excluded_versions: list[str] | None = None,
 ) -> list[dict[str, object]] | str:
     """Build Slack blocks or a single text body from rootcoz API rows.
 
@@ -346,6 +347,7 @@ def build_message(
         mention_suffix = f" — {mention}"
 
     lanes = ", ".join(tiers) if tiers else ""
+    excl_display = f" (excl. {', '.join(excluded_versions)})" if excluded_versions else ""
     header = _safe_format(
         message.header_template,
         "header",
@@ -353,6 +355,7 @@ def build_message(
         mention_suffix=mention_suffix,
         mention=mention,
         lanes=lanes,
+        excluded_versions=excl_display,
     )
     totals = _safe_format(
         message.totals_template,
@@ -409,6 +412,7 @@ def build_blocks(
     columns: list[DigestColumn] | None = None,
     message: MessageConfig | None = None,
     tiers: list[str] | None = None,
+    excluded_versions: list[str] | None = None,
 ) -> list[dict[str, object]]:
     """Build Block Kit only (forces ``message.format = blocks``)."""
     msg = message or MessageConfig()
@@ -422,6 +426,7 @@ def build_blocks(
         message=msg,
         mention=mention,
         tiers=tiers,
+        excluded_versions=excluded_versions,
     )
     assert isinstance(result, list)
     return result

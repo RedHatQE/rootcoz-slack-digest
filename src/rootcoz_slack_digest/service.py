@@ -255,6 +255,11 @@ def run_digest(
                 mention_suffix = f" — {mention}" if mention else ""
 
                 tier_display = ", ".join(cfg.digest.tiers) if cfg.digest.tiers else "all tiers"
+                excl_display = (
+                    f" (excl. {', '.join(cfg.digest.exclude_versions)})"
+                    if cfg.digest.exclude_versions
+                    else ""
+                )
                 template_vars = {
                     "week_label": window.label,
                     "mention_suffix": mention_suffix,
@@ -262,6 +267,7 @@ def run_digest(
                     "team": target.team,
                     "total_jobs": str(total_jobs),
                     "lanes": tier_display,
+                    "excluded_versions": excl_display,
                 }
 
                 if total_jobs > 0:
@@ -324,6 +330,7 @@ def run_digest(
                 message=cfg.message,
                 mention=mention,
                 tiers=cfg.digest.tiers or None,
+                excluded_versions=cfg.digest.exclude_versions or None,
             )
             target_results.append(
                 TargetResult(

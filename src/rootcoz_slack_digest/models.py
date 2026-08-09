@@ -130,7 +130,9 @@ class MessageConfig(BaseModel):
 
     format: MessageFormat = MessageFormat.BLOCKS
     include_mentions: bool = True
-    header_template: str = "*rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}"
+    header_template: str = (
+        "*rootcoz {lanes} weekly digest* — {week_label}{excluded_versions}{mention_suffix}"
+    )
     totals_template: str = "Jobs: *{total_jobs}* · Reviewed: *{total_reviewed}/{total_failures}*"
     row_template: str = (
         "• *{job_name}* ({tier}) — fail {failures} / rev {reviewed}{jenkins_part}{rootcoz_part}"
@@ -138,11 +140,11 @@ class MessageConfig(BaseModel):
     omitted_template: str = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
     table_code_fence: bool = True
     celebration_reviewed_template: str = (
-        "🎉 *rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}\n\n"
+        "🎉 *rootcoz {lanes} weekly digest* — {week_label}{excluded_versions}{mention_suffix}\n\n"
         "✅ All *{total_jobs}* {lanes} failures for *{team}* have been reviewed! 👏"
     )
     celebration_no_failures_template: str = (
-        "🎉 *rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}\n\n"
+        "🎉 *rootcoz {lanes} weekly digest* — {week_label}{excluded_versions}{mention_suffix}\n\n"
         "✅ Zero {lanes} failures for *{team}* this week! 🚀"
     )
     email_subject_template: str = "rootcoz {lanes} weekly digest — {week_label} — {team}"

@@ -34,8 +34,8 @@ exclude_versions = ["4.99", "5.99"]
 [message]
 format = "blocks" # blocks | mrkdwn | plain
 include_mentions = true
-# Placeholders: {week_label}, {mention_suffix}, {mention}, {lanes}
-header_template = "*rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}"
+# Placeholders: {week_label}, {excluded_versions}, {mention_suffix}, {mention}, {lanes}
+header_template = "*rootcoz {lanes} weekly digest* — {week_label}{excluded_versions}{mention_suffix}"
 # Placeholders: {total_jobs}, {total_failures}, {total_reviewed}, {week_label}
 totals_template = "Jobs: *{total_jobs}* · Reviewed: *{total_reviewed}/{total_failures}*"
 # row_template applies only for plain format when table_code_fence = false (list style).
@@ -46,9 +46,9 @@ omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
 # table_code_fence only applies to plain format; blocks/mrkdwn use grouped-by-tier links.
 table_code_fence = true
 # Celebration when a target has no open failures. Placeholders:
-# {week_label}, {mention_suffix}, {mention}, {team}, {total_jobs}, {lanes}
-# celebration_reviewed_template = "🎉 *rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}\n\n✅ All *{total_jobs}* {lanes} failures for *{team}* have been reviewed! 👏"
-# celebration_no_failures_template = "🎉 *rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}\n\n✅ Zero {lanes} failures for *{team}* this week! 🚀"
+# {week_label}, {excluded_versions}, {mention_suffix}, {mention}, {team}, {total_jobs}, {lanes}
+# celebration_reviewed_template = "🎉 *rootcoz {lanes} weekly digest* — {week_label}{excluded_versions}{mention_suffix}\n\n✅ All *{total_jobs}* {lanes} failures for *{team}* have been reviewed! 👏"
+# celebration_no_failures_template = "🎉 *rootcoz {lanes} weekly digest* — {week_label}{excluded_versions}{mention_suffix}\n\n✅ Zero {lanes} failures for *{team}* this week! 🚀"
 # Email subject. Placeholders: {lanes}, {week_label}, {team}
 # email_subject_template = "rootcoz {lanes} weekly digest — {week_label} — {team}"
 

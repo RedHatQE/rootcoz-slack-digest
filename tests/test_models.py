@@ -60,5 +60,8 @@ def test_message_and_field_map_configurable_defaults() -> None:
     msg = MessageConfig()
     assert "{lanes}" in msg.celebration_reviewed_template
     assert "{lanes}" in msg.celebration_no_failures_template
+    assert "{excluded_versions}" in msg.header_template
+    assert "{excluded_versions}" in msg.celebration_reviewed_template
+    assert "{excluded_versions}" in msg.celebration_no_failures_template
     assert msg.email_subject_template.startswith("rootcoz")
     assert FieldMapConfig().bundle_pattern == r"v\d+\.\d+\."

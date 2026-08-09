@@ -262,3 +262,31 @@ def test_build_message_includes_lanes_in_header() -> None:
     )
     assert isinstance(payload, str)
     assert "*rootcoz gating, release-checklist weekly digest*" in payload
+
+
+def test_build_message_includes_excluded_versions_in_header() -> None:
+    window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
+    payload = build_message(
+        window=window,
+        rows=[_row("j", 1, 0)],
+        max_rows=10,
+        sort_by=SortBy.JOB_NAME,
+        columns=[DigestColumn.JOB_NAME],
+        message=MessageConfig(format=MessageFormat.MRKDWN),
+        tiers=["gating"],
+        excluded_versions=["4.99", "5.0"],
+    )
+    assert isinstance(payload, str)
+    assert "(excl. 4.99, 5.0)" in payload
+    empty = build_message(
+        window=window,
+        rows=[_row("j", 1, 0)],
+        max_rows=10,
+        sort_by=SortBy.JOB_NAME,
+        columns=[DigestColumn.JOB_NAME],
+        message=MessageConfig(format=MessageFormat.MRKDWN),
+        tiers=["gating"],
+        excluded_versions=None,
+    )
+    assert isinstance(empty, str)
+    assert "excl." not in empty
