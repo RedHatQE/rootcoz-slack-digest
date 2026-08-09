@@ -159,6 +159,12 @@ def run_digest(
             if own_rootcoz:
                 client.close()
 
+    # Filter by configured tiers (if specified)
+    if cfg.digest.tiers:
+        allowed_tiers = set(cfg.digest.tiers)
+        rows = [r for r in rows if r.tier in allowed_tiers]
+        logger.info("After tier filter (%s): %d rows", ", ".join(cfg.digest.tiers), len(rows))
+
     resolved_targets = targets if targets is not None else _load_slack_targets()
     if not resolved_targets:
         if dry_run:
