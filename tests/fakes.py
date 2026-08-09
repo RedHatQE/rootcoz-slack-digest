@@ -36,8 +36,9 @@ class FakeRootcozClient:
         labels: list[str] | None = None,
         exclude_labels: list[str] | None = None,
         exclude_versions: list[str] | None = None,
+        include_tags: list[str] | None = None,
     ) -> list[JobRow]:
-        del window, labels, exclude_labels, exclude_versions
+        del window, labels, exclude_labels, exclude_versions, include_tags
         return [r for r in self.unreviewed if not team or r.team == team]
 
     def fetch_all_jobs(
@@ -48,8 +49,9 @@ class FakeRootcozClient:
         labels: list[str] | None = None,
         exclude_labels: list[str] | None = None,
         exclude_versions: list[str] | None = None,
+        include_tags: list[str] | None = None,
     ) -> list[JobRow]:
-        del window, labels, exclude_labels, exclude_versions
+        del window, labels, exclude_labels, exclude_versions, include_tags
         return [r for r in self.all_jobs if not team or r.team == team]
 
     def close(self) -> None:

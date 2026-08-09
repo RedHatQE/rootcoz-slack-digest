@@ -88,6 +88,7 @@ class RootcozClient:
         payload: Any,
         *,
         exclude_versions: list[str] | None = None,
+        include_tags: list[str] | None = None,
     ) -> list[JobRow]:
         """Parse API JSON into JobRow list."""
         if not isinstance(payload, (list, dict)):
@@ -146,6 +147,11 @@ class RootcozClient:
 
             # Extract bundle version from tags (e.g., "v4.22.6.rhel9-9")
             raw_tags = resolve_path(job, fm.tags)
+            # Include only jobs with at least one matching tag
+            if include_tags:
+                job_tags = [str(t) for t in (raw_tags or [])]
+                if not any(it in tag for it in include_tags for tag in job_tags):
+                    continue
             bundle = ""
             if isinstance(raw_tags, list):
                 for tag in raw_tags:
@@ -180,6 +186,7 @@ class RootcozClient:
         labels: list[str] | None = None,
         exclude_labels: list[str] | None = None,
         exclude_versions: list[str] | None = None,
+        include_tags: list[str] | None = None,
     ) -> list[JobRow]:
         """Fetch jobs with server-side filtering via API query params."""
         params = self._query_params(
@@ -191,7 +198,11 @@ class RootcozClient:
         )
         resp = self._client.get(self._config.endpoint, params=params)
         resp.raise_for_status()
-        rows = self._parse_job_rows(resp.json(), exclude_versions=exclude_versions)
+        rows = self._parse_job_rows(
+            resp.json(),
+            exclude_versions=exclude_versions,
+            include_tags=include_tags,
+        )
         logger.info(
             "Fetched %d jobs from rootcoz (%s) team=%r labels=%s",
             len(rows),
@@ -209,6 +220,7 @@ class RootcozClient:
         labels: list[str] | None = None,
         exclude_labels: list[str] | None = None,
         exclude_versions: list[str] | None = None,
+        include_tags: list[str] | None = None,
     ) -> list[JobRow]:
         """Fetch all jobs (reviewed + unreviewed) for celebration context."""
         params = self._query_params(
@@ -220,7 +232,11 @@ class RootcozClient:
         )
         resp = self._client.get(self._config.endpoint, params=params)
         resp.raise_for_status()
-        rows = self._parse_job_rows(resp.json(), exclude_versions=exclude_versions)
+        rows = self._parse_job_rows(
+            resp.json(),
+            exclude_versions=exclude_versions,
+            include_tags=include_tags,
+        )
         logger.info(
             "Fetched %d all-status jobs from rootcoz (%s) team=%r labels=%s",
             len(rows),

@@ -22,6 +22,7 @@ data:
     exclude_labels = ["s390x"]
     exclude_job_patterns = ["s390x"]
     exclude_versions = ["4.99", "5.99", "5.0", "4.23"]
+    include_tags = ["rootcoz-jenkins-bot"]
 
     [message]
     format = "blocks"

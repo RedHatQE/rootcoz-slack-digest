@@ -114,6 +114,9 @@ class DigestConfig(BaseModel):
     exclude_job_patterns: list[str] = Field(default_factory=list)
     # Client-side filter: drop jobs whose metadata.version is in this list.
     exclude_versions: list[str] = Field(default_factory=list)
+    # Client-side filter: only include jobs whose tags contain at least one value.
+    # Empty = no filter (all jobs).
+    include_tags: list[str] = Field(default_factory=list)
 
     @field_validator("columns", mode="before")
     @classmethod

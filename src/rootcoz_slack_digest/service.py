@@ -213,6 +213,7 @@ def run_digest(
                     labels=api_labels or None,
                     exclude_labels=cfg.digest.exclude_labels or None,
                     exclude_versions=cfg.digest.exclude_versions or None,
+                    include_tags=cfg.digest.include_tags or None,
                 )
                 if cfg.digest.exclude_job_patterns:
                     patterns = cfg.digest.exclude_job_patterns
@@ -241,6 +242,7 @@ def run_digest(
                         labels=api_labels or None,
                         exclude_labels=cfg.digest.exclude_labels or None,
                         exclude_versions=cfg.digest.exclude_versions or None,
+                        include_tags=cfg.digest.include_tags or None,
                     )
                     if cfg.digest.exclude_job_patterns:
                         patterns = cfg.digest.exclude_job_patterns

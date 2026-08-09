@@ -30,6 +30,9 @@ exclude_labels = []
 exclude_job_patterns = ["s390x"]
 # Exclude jobs with these metadata.version values.
 exclude_versions = ["4.99", "5.99"]
+# Only include jobs whose tags contain at least one of these values.
+# Empty = no filter. Example: filter by trigger source.
+include_tags = []
 
 [message]
 format = "blocks" # blocks | mrkdwn | plain

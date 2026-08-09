@@ -173,3 +173,51 @@ def test_fetch_all_jobs_excludes_versions() -> None:
         rows = client.fetch_all_jobs(window, exclude_versions=["5.99"])
 
     assert [r.job_id for r in rows] == ["j1"]
+
+
+def test_fetch_job_rows_include_tags() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "job_id": "j1",
+                    "job_name": "bot-triggered",
+                    "metadata": {"team": "network", "version": "4.22", "labels": ["gating"]},
+                    "failure_count": 1,
+                    "reviewed_count": 0,
+                    "tags": ["cnv", "rootcoz-jenkins-bot", "v4.22.6.rhel9-9"],
+                },
+                {
+                    "job_id": "j2",
+                    "job_name": "manual-trigger",
+                    "metadata": {"team": "network", "version": "4.22", "labels": ["gating"]},
+                    "failure_count": 2,
+                    "reviewed_count": 0,
+                    "tags": ["cnv", "manual"],
+                },
+                {
+                    "job_id": "j3",
+                    "job_name": "no-tags",
+                    "metadata": {"team": "network", "version": "4.22", "labels": ["gating"]},
+                    "failure_count": 1,
+                    "reviewed_count": 0,
+                },
+            ],
+        )
+
+    transport = httpx.MockTransport(handler)
+    http = httpx.Client(transport=transport, base_url="https://rootcoz.example")
+    cfg = RootcozConfig(url="https://rootcoz.example", api_key="test-key")
+    window: WeekWindow = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
+
+    with RootcozClient(cfg, client=http) as client:
+        rows = client.fetch_job_rows(
+            window,
+            team="network",
+            include_tags=["rootcoz-jenkins-bot"],
+        )
+
+    assert [r.job_id for r in rows] == ["j1"]
+    assert rows[0].bundle == "v4.22.6.rhel9-9"

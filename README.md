@@ -48,7 +48,8 @@ cron = "0 7 * * 0"
 
 [digest]
 columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
-# Also: exclude_labels, exclude_job_patterns, sort_by, max_rows, tiers
+# Also: exclude_labels, exclude_job_patterns, exclude_versions, include_tags,
+# sort_by, max_rows, tiers
 
 [message]
 format = "blocks"           # blocks | mrkdwn | plain
@@ -63,8 +64,9 @@ enabled = false
 ```
 
 See `config/config.example.toml` for all keys (columns, message templates, tiers,
-`exclude_labels`, `exclude_job_patterns`, celebration templates,
-`email_subject_template`, `bundle_pattern`, `default_tier`, and more).
+`exclude_labels`, `exclude_job_patterns`, `exclude_versions`, `include_tags`,
+celebration templates, `email_subject_template`, `bundle_pattern`, `default_tier`,
+and more).
 Team routing is via `TARGETS`, not `[digest]` config.
 
 ## Mentions (no people lists in git)
