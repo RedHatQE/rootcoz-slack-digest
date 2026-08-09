@@ -266,7 +266,7 @@ def _build_table_blocks(rows: list[JobRow]) -> list[dict[str, object]]:
 
         # data_table: page_size keeps rows expanded (table collapses by default)
         # caption must be a plain string (not rich_text)
-        caption_text = tier if show_tier_header else "Jobs"
+        caption_text = tier if show_tier_header else " "
         blocks.append(
             {
                 "type": "data_table",
