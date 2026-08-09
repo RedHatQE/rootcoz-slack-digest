@@ -81,6 +81,7 @@ class JobRow(BaseModel):
     rootcoz_url: str = ""
     created_at: str = ""
     version: str = ""
+    bundle: str = ""
 
     @property
     def not_reviewed(self) -> int:
@@ -128,10 +129,7 @@ class MessageConfig(BaseModel):
     format: MessageFormat = MessageFormat.BLOCKS
     include_mentions: bool = True
     header_template: str = "*rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}"
-    totals_template: str = (
-        "Jobs: *{total_jobs}* · Failures: *{total_failures}* · "
-        "Reviewed: *{total_reviewed}/{total_failures}*"
-    )
+    totals_template: str = "Jobs: *{total_jobs}* · Reviewed: *{total_reviewed}/{total_failures}*"
     row_template: str = (
         "• *{job_name}* ({tier}) — fail {failures} / rev {reviewed}{jenkins_part}{rootcoz_part}"
     )
@@ -155,6 +153,7 @@ class FieldMapConfig(BaseModel):
     jenkins: str = "jenkins_url"
     rootcoz: str = "{url}/results/{job_id}"
     created_at: str = "created_at"
+    tags: str = "tags"  # raw tags array path
 
 
 class TierLabelsConfig(BaseModel):

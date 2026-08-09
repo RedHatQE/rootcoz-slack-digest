@@ -89,6 +89,7 @@ def _row_template_vars(row: JobRow) -> dict[str, str]:
         "created_at": row.created_at,
         "date": row.created_at[:10] if row.created_at else "",
         "version": row.version,
+        "bundle": row.bundle,
     }
 
 
@@ -123,13 +124,21 @@ _TIER_ORDER = {"gating": 0, "release-checklist": 1}
 
 
 def _version_sort_key(version: str) -> tuple[int, ...]:
-    """Parse version string into comparable tuple. E.g., '4.22' → (4, 22)."""
+    """Parse version string into comparable tuple. Handles v4.22.6.rhel9-9."""
     if not version:
         return (0,)
+    cleaned = version.lstrip("v")
     parts: list[int] = []
-    for part in version.split("."):
+    for part in cleaned.split("."):
+        # Handle parts like "rhel9-9" by extracting leading digits
+        digits = ""
+        for ch in part:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
         try:
-            parts.append(int(part))
+            parts.append(int(digits) if digits else 0)
         except ValueError:
             parts.append(0)
     return tuple(parts)
@@ -139,7 +148,7 @@ def _format_grouped_by_tier(rows: list[JobRow]) -> str:
     """Format rows grouped by tier with inline mrkdwn links.
 
     Order: gating → release-checklist → other tiers alphabetically.
-    Within each tier, sorted by version descending, then failure_count descending.
+    Within each tier, sorted by bundle descending, then failure_count descending.
     """
     groups: dict[str, list[JobRow]] = {}
     for row in rows:
@@ -154,7 +163,11 @@ def _format_grouped_by_tier(rows: list[JobRow]) -> str:
     for tier in sorted_tiers:
         tier_rows = sorted(
             groups[tier],
-            key=lambda r: (_version_sort_key(r.version), r.failure_count),
+            key=lambda r: (
+                _version_sort_key(r.version),
+                _version_sort_key(r.bundle.lstrip("v")),
+                r.failure_count,
+            ),
             reverse=True,
         )
         lines = [f"*{tier}*"]
@@ -164,10 +177,8 @@ def _format_grouped_by_tier(rows: list[JobRow]) -> str:
             else:
                 name_part = f"*{row.job_name}*"
 
-            date_str = row.created_at[:10] if row.created_at else ""
-            date_part = f" · {date_str}" if date_str else ""
-            version_part = f"({row.version}) " if row.version else ""
-            stats = f"{version_part}fail {row.failure_count} / rev {row.reviewed_count}{date_part}"
+            bundle_part = f" [{row.bundle}]" if row.bundle else ""
+            stats = f"{row.reviewed_count} out of {row.failure_count} reviewed{bundle_part}"
             parts = [f"• {name_part} — {stats}"]
             if row.rootcoz_url:
                 parts.append(_link("rootcoz", row.rootcoz_url))

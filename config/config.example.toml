@@ -30,9 +30,9 @@ include_mentions = true
 # Placeholders: {week_label}, {mention_suffix}, {mention}, {lanes}
 header_template = "*rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}"
 # Placeholders: {total_jobs}, {total_failures}, {total_reviewed}, {week_label}
-totals_template = "Jobs: *{total_jobs}* · Failures: *{total_failures}* · Reviewed: *{total_reviewed}/{total_failures}*"
+totals_template = "Jobs: *{total_jobs}* · Reviewed: *{total_reviewed}/{total_failures}*"
 # row_template applies only for plain format when table_code_fence = false (list style).
-# Placeholders: {job_name}, {tier}, {team}, {failures}, {reviewed}, {not_reviewed}, {build}, {jenkins_url}, {rootcoz_url}, {jenkins_link}, {rootcoz_link}, {jenkins_part}, {rootcoz_part}, {job_id}
+# Placeholders: {job_name}, {tier}, {team}, {failures}, {reviewed}, {not_reviewed}, {build}, {jenkins_url}, {rootcoz_url}, {jenkins_link}, {rootcoz_link}, {jenkins_part}, {rootcoz_part}, {job_id}, {bundle}
 row_template = "• *{job_name}* ({tier}) — fail {failures} / rev {reviewed}{jenkins_part}{rootcoz_part}"
 # Placeholders: {omitted} (only used when digest.max_rows > 0)
 omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
@@ -65,6 +65,7 @@ reviewed = "reviewed_count"
 build = "build_number"
 jenkins = "jenkins_url"
 rootcoz = "{url}/results/{job_id}"
+tags = "tags"
 
 # Map API label values → display tier names.
 # When tier field is a list, first matching label wins.

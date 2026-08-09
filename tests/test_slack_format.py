@@ -20,6 +20,7 @@ def _row(
     *,
     tier: str = "gating",
     version: str = "",
+    bundle: str = "",
 ) -> JobRow:
     return JobRow(
         job_id=name,
@@ -30,6 +31,7 @@ def _row(
         jenkins_url=f"https://jenkins.example/job/{name}/1/",
         rootcoz_url=f"https://rootcoz.example/results/{name}",
         version=version,
+        bundle=bundle,
     )
 
 
@@ -121,16 +123,17 @@ def test_grouped_by_tier_order_and_links() -> None:
     # Within gating: higher failures first
     assert payload.index("gate-high") < payload.index("gate-low")
     assert "<https://jenkins.example/job/gate-high/1/|gate-high>" in payload
-    assert "fail 23 / rev 0 · <https://rootcoz.example/results/gate-high|rootcoz>" in payload
+    assert "0 out of 23 reviewed · <https://rootcoz.example/results/gate-high|rootcoz>" in payload
 
 
-def test_grouped_by_tier_sorts_by_version_then_failures() -> None:
+def test_grouped_by_tier_sorts_by_version_then_bundle_then_failures() -> None:
     window = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
     rows = [
-        _row("job-4.22-high", 14, 0, version="4.22"),
-        _row("job-5.0", 3, 0, version="5.0"),
-        _row("job-4.22-low", 1, 0, version="4.22"),
-        _row("job-4.23", 1, 0, version="4.23"),
+        _row("job-4.22-high", 14, 0, version="4.22", bundle="v4.22.6.rhel9-9"),
+        _row("job-5.0", 3, 0, version="5.0", bundle="v5.0.0.rhel9-9"),
+        _row("job-4.22-older", 2, 0, version="4.22", bundle="v4.22.5.rhel9-8"),
+        _row("job-4.22-low", 1, 0, version="4.22", bundle="v4.22.6.rhel9-9"),
+        _row("job-4.23", 1, 0, version="4.23", bundle="v4.23.0.rhel9-9"),
     ]
     payload = build_message(
         window=window,
@@ -144,8 +147,9 @@ def test_grouped_by_tier_sorts_by_version_then_failures() -> None:
     assert payload.index("job-5.0") < payload.index("job-4.23")
     assert payload.index("job-4.23") < payload.index("job-4.22-high")
     assert payload.index("job-4.22-high") < payload.index("job-4.22-low")
-    assert "(5.0) fail 3 / rev 0" in payload
-    assert "(4.22) fail 14 / rev 0" in payload
+    assert payload.index("job-4.22-low") < payload.index("job-4.22-older")
+    assert "0 out of 3 reviewed [v5.0.0.rhel9-9]" in payload
+    assert "0 out of 14 reviewed [v4.22.6.rhel9-9]" in payload
 
 
 def test_columns_omit_jenkins() -> None:

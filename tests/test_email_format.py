@@ -17,6 +17,7 @@ def test_format_digest_html_includes_rows_and_links() -> None:
             failure_count=3,
             reviewed_count=1,
             version="4.22",
+            bundle="v4.22.6.rhel9-9",
             jenkins_url="https://jenkins.example/job/n/1/",
             rootcoz_url="https://rootcoz.example/results/j1",
             created_at="2026-07-28T12:00:00Z",
@@ -28,9 +29,7 @@ def test_format_digest_html_includes_rows_and_links() -> None:
     assert "tier2-network" in html
     assert "https://jenkins.example/job/n/1/" in html
     assert "https://rootcoz.example/results/j1" in html
-    assert "fail 3 / rev 1" in html
-    assert "(4.22)" in html
-    assert "2026-07-28" in html
+    assert "1 out of 3 reviewed [v4.22.6.rhel9-9]" in html
 
 
 def test_format_celebration_html_zero_and_all_reviewed() -> None:

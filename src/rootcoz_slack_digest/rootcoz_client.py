@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -116,6 +117,16 @@ class RootcozClient:
             else:
                 rootcoz_url = str(resolve_path(job, fm.rootcoz) or "")
 
+            # Extract bundle version from tags (e.g., "v4.22.6.rhel9-9")
+            raw_tags = resolve_path(job, fm.tags)
+            bundle = ""
+            if isinstance(raw_tags, list):
+                for tag in raw_tags:
+                    tag_str = str(tag)
+                    if re.match(r"v\d+\.\d+\.", tag_str):
+                        bundle = tag_str
+                        break
+
             rows.append(
                 JobRow(
                     job_id=job_id,
@@ -129,6 +140,7 @@ class RootcozClient:
                     rootcoz_url=rootcoz_url,
                     created_at=created_at,
                     version=version,
+                    bundle=bundle,
                 )
             )
         logger.info(

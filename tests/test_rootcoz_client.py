@@ -31,6 +31,7 @@ def test_fetch_job_rows_sends_server_side_filters() -> None:
                     "build_number": 9,
                     "jenkins_url": "https://jenkins.example/job/tier2-network/9/",
                     "created_at": "2026-08-01T00:00:00Z",
+                    "tags": ["cnv", "v4.22.6.rhel9-9", "other"],
                 }
             ],
         )
@@ -51,6 +52,7 @@ def test_fetch_job_rows_sends_server_side_filters() -> None:
     assert len(rows) == 1
     assert rows[0].team == "network"
     assert rows[0].version == "4.22"
+    assert rows[0].bundle == "v4.22.6.rhel9-9"
     params = httpx.URL(captured["url"]).params
     assert params.get("team") == "network"
     assert params.get("date_from") == "2026-07-26"

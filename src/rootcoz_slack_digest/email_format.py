@@ -39,7 +39,11 @@ def format_digest_html(
     for tier in sorted_tiers:
         tier_rows = sorted(
             groups[tier],
-            key=lambda r: (_version_sort_key(r.version), r.failure_count),
+            key=lambda r: (
+                _version_sort_key(r.version),
+                _version_sort_key(r.bundle.lstrip("v")),
+                r.failure_count,
+            ),
             reverse=True,
         )
         html_parts.append(f"<h3>{tier}</h3>")
@@ -51,12 +55,11 @@ def format_digest_html(
                 else f"<strong>{row.job_name}</strong>"
             )
             rootcoz_html = f' · <a href="{row.rootcoz_url}">rootcoz</a>' if row.rootcoz_url else ""
-            version_html = f" ({row.version})" if row.version else ""
-            date_html = f" · {row.created_at[:10]}" if row.created_at else ""
+            bundle_html = f" [{row.bundle}]" if row.bundle else ""
             html_parts.append(
-                f"<li>{name_html}{version_html} — "
-                f"fail {row.failure_count} / rev {row.reviewed_count}"
-                f"{date_html}{rootcoz_html}</li>"
+                f"<li>{name_html} — "
+                f"{row.reviewed_count} out of {row.failure_count} reviewed"
+                f"{bundle_html}{rootcoz_html}</li>"
             )
         html_parts.append("</ul>")
 
