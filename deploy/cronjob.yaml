@@ -6,7 +6,7 @@ metadata:
   labels:
     app: rootcoz-slack-digest
 spec:
-  # Sunday 07:00 UTC — after the Mon–Sun week closes
+  # Must match [schedule].cron in config / ConfigMap
   schedule: "0 7 * * 0"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3

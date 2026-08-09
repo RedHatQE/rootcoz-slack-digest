@@ -1,4 +1,4 @@
-"""Orchestrate week → rootcoz → format → Slack."""
+"""Orchestrate week → rootcoz API → format → Slack."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from rootcoz_slack_digest.mentions import (
 from rootcoz_slack_digest.models import AppConfig, JobRow, RootcozConfig, SlackConfig
 from rootcoz_slack_digest.rootcoz_client import RootcozClient
 from rootcoz_slack_digest.slack_client import SlackClient
-from rootcoz_slack_digest.slack_format import build_blocks
+from rootcoz_slack_digest.slack_format import build_message
 from rootcoz_slack_digest.week import last_complete_week, week_from_dates
 
 logger = logging.getLogger(__name__)
@@ -27,9 +27,16 @@ logger = logging.getLogger(__name__)
 class DigestResult:
     """Outcome of a digest run."""
 
-    blocks: list[dict[str, object]]
+    payload: list[dict[str, object]] | str
     rows: list[JobRow]
     posted: bool
+
+    @property
+    def blocks(self) -> list[dict[str, object]]:
+        """Block Kit payload when format=blocks; empty list otherwise."""
+        if isinstance(self.payload, list):
+            return self.payload
+        return []
 
 
 def apply_env_overrides(config: AppConfig) -> AppConfig:
@@ -70,11 +77,17 @@ def run_digest(
     rootcoz_client: RootcozClient | None = None,
     slack_client: SlackClient | None = None,
 ) -> DigestResult:
-    """Build (and optionally post) the weekly digest.
+    """Query rootcoz API for the week, format the message, optionally post.
 
     When ``rows`` is provided, rootcoz is not contacted (tests / offline render).
+    Message content always comes from API job rows — never from HTML report URLs.
     """
     cfg = apply_env_overrides(config)
+    logger.info(
+        "Digest schedule (CronJob must match): cron=%r timezone=%r",
+        cfg.schedule.cron,
+        cfg.schedule.timezone,
+    )
     if date_from is not None and date_to is not None:
         window = week_from_dates(date_from, date_to)
     else:
@@ -99,38 +112,39 @@ def run_digest(
             if own_rootcoz:
                 client.close()
 
-    mention = _resolve_primary_mention(cfg, usergroup_resolver)
-    blocks = build_blocks(
+    mention = ""
+    if cfg.message.include_mentions:
+        mention = _resolve_primary_mention(cfg, usergroup_resolver)
+
+    payload = build_message(
         window=window,
         rows=rows,
         max_rows=cfg.digest.max_rows,
         sort_by=cfg.digest.sort_by,
+        columns=list(cfg.digest.columns),
+        message=cfg.message,
         mention=mention,
-        summary_url=cfg.digest.rootcause_summary_url,
     )
 
     if dry_run:
-        logger.info("Dry-run: not posting to Slack (%d jobs)", len(rows))
-        return DigestResult(blocks=blocks, rows=rows, posted=False)
+        logger.info("Dry-run: not posting to Slack (%d jobs from API)", len(rows))
+        return DigestResult(payload=payload, rows=rows, posted=False)
 
     own_slack = slack_client is None
     sc = slack_client or SlackClient(cfg.slack)
     try:
-        sc.post_blocks(blocks)
+        sc.post(payload)
     finally:
         if own_slack:
             sc.close()
-    return DigestResult(blocks=blocks, rows=rows, posted=True)
+    return DigestResult(payload=payload, rows=rows, posted=True)
 
 
 def _resolve_primary_mention(
     cfg: AppConfig,
     resolver: UsergroupResolver | None,
 ) -> str:
-    """Build a single CC line from configured team usergroups.
-
-    Mentions every configured team handle that resolves. Empty if none.
-    """
+    """Build a CC line from configured team usergroups."""
     handles = list(cfg.mentions.teams.values())
     if not handles:
         return ""
@@ -141,7 +155,6 @@ def _resolve_primary_mention(
             resolver = SlackUsergroupResolver(cfg.slack.bot_token)
             own = True
         else:
-            # Webhook mode cannot resolve usergroups; skip pings.
             logger.warning("No bot token; cannot resolve usergroup mentions — posting without CC")
             return ""
 
@@ -153,12 +166,19 @@ def _resolve_primary_mention(
             resolver.close()
 
 
+def render_payload(payload: list[dict[str, object]] | str) -> str:
+    """Pretty-print payload for dry-run / render CLI."""
+    if isinstance(payload, str):
+        return payload
+    return json.dumps(payload, indent=2, sort_keys=False)
+
+
+# Back-compat alias
 def render_blocks_json(blocks: list[dict[str, object]]) -> str:
-    """Pretty-print blocks for dry-run / render CLI."""
-    return json.dumps(blocks, indent=2, sort_keys=False)
+    """Pretty-print Block Kit JSON."""
+    return render_payload(blocks)
 
 
-# Re-export for tests / typing convenience
 __all__ = [
     "DigestResult",
     "RootcozConfig",
@@ -166,5 +186,6 @@ __all__ = [
     "StaticUsergroupResolver",
     "apply_env_overrides",
     "render_blocks_json",
+    "render_payload",
     "run_digest",
 ]

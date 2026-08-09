@@ -1,9 +1,15 @@
-"""Tests for Slack Block Kit formatting."""
+"""Tests for Slack message formatting from API rows."""
 
 from datetime import date
 
-from rootcoz_slack_digest.models import JobRow, SortBy
-from rootcoz_slack_digest.slack_format import build_blocks, sort_rows
+from rootcoz_slack_digest.models import (
+    DigestColumn,
+    JobRow,
+    MessageConfig,
+    MessageFormat,
+    SortBy,
+)
+from rootcoz_slack_digest.slack_format import build_message, sort_rows
 from rootcoz_slack_digest.week import week_from_dates
 
 
@@ -21,25 +27,66 @@ def _row(name: str, failures: int, reviewed: int) -> JobRow:
 
 def test_sort_by_not_reviewed() -> None:
     rows = [
-        _row("a", 10, 9),  # 1 left
-        _row("b", 5, 0),  # 5 left
-        _row("c", 3, 3),  # 0 left
+        _row("a", 10, 9),
+        _row("b", 5, 0),
+        _row("c", 3, 3),
     ]
     ordered = sort_rows(rows, SortBy.NOT_REVIEWED)
     assert [r.job_name for r in ordered] == ["b", "a", "c"]
 
 
-def test_build_blocks_includes_mention_and_omission() -> None:
+def test_build_message_blocks_no_html_summary() -> None:
     window = week_from_dates(date(2026, 7, 27), date(2026, 8, 2))
     rows = [_row(f"job-{i}", 2, 0) for i in range(5)]
-    blocks = build_blocks(
+    payload = build_message(
         window=window,
         rows=rows,
         max_rows=2,
         sort_by=SortBy.NOT_REVIEWED,
+        columns=[
+            DigestColumn.JOB_NAME,
+            DigestColumn.TIER,
+            DigestColumn.FAILURES,
+            DigestColumn.REVIEWED,
+            DigestColumn.JENKINS,
+            DigestColumn.ROOTCOZ,
+        ],
+        message=MessageConfig(),
         mention="<!subteam^S1>",
-        summary_url="https://summary.example/",
     )
-    header = blocks[0]["text"]["text"]  # type: ignore[index]
-    assert "cc <!subteam^S1>" in header
-    assert any("+3 more" in str(b.get("elements", b.get("text", ""))) for b in blocks)
+    assert isinstance(payload, list)
+    blob = str(payload)
+    assert "cc <!subteam^S1>" in blob
+    assert "HTML summary" not in blob
+    assert "rootcause-summary" not in blob
+    assert "+3 more" in blob
+
+
+def test_columns_omit_jenkins() -> None:
+    window = week_from_dates(date(2026, 7, 27), date(2026, 8, 2))
+    payload = build_message(
+        window=window,
+        rows=[_row("only", 1, 0)],
+        max_rows=10,
+        sort_by=SortBy.JOB_NAME,
+        columns=[DigestColumn.JOB_NAME, DigestColumn.FAILURES, DigestColumn.ROOTCOZ],
+        message=MessageConfig(format=MessageFormat.MRKDWN, table_code_fence=True),
+        mention="",
+    )
+    assert isinstance(payload, str)
+    assert "Jenkins" not in payload
+    assert "rootcoz" in payload
+
+
+def test_plain_format_is_string() -> None:
+    window = week_from_dates(date(2026, 7, 27), date(2026, 8, 2))
+    payload = build_message(
+        window=window,
+        rows=[_row("j", 1, 0)],
+        max_rows=10,
+        sort_by=SortBy.JOB_NAME,
+        columns=[DigestColumn.JOB_NAME, DigestColumn.FAILURES],
+        message=MessageConfig(format=MessageFormat.PLAIN),
+    )
+    assert isinstance(payload, str)
+    assert "HTML" not in payload

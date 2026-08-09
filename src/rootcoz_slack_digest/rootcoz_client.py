@@ -108,6 +108,7 @@ class RootcozClient:
                     team=team,
                     failure_count=int(job.get("failure_count") or 0),
                     reviewed_count=int(job.get("reviewed_count") or 0),
+                    build_number=build_int,
                     jenkins_url=jenkins,
                     rootcoz_url=rootcoz_result_url(self._config.url, job_id),
                 )
