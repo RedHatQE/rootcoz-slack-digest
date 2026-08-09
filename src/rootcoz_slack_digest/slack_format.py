@@ -170,7 +170,7 @@ def _format_grouped_by_tier(rows: list[JobRow]) -> str:
             ),
             reverse=True,
         )
-        lines = [f"*{tier}*"]
+        lines = [f"*{tier}*"] if len(sorted_tiers) > 1 else []
         for row in tier_rows:
             if row.jenkins_url:
                 name_part = _link(row.job_name, row.jenkins_url)
@@ -178,8 +178,8 @@ def _format_grouped_by_tier(rows: list[JobRow]) -> str:
                 name_part = f"*{row.job_name}*"
 
             bundle_part = f" [{row.bundle}]" if row.bundle else ""
-            stats = f"{row.reviewed_count} / {row.failure_count} reviewed{bundle_part}"
-            parts = [f"• {name_part} — {stats}"]
+            reviewed = f"{row.reviewed_count}/{row.failure_count} reviewed"
+            parts = [f"• {name_part}{bundle_part} {reviewed}"]
             if row.rootcoz_url:
                 parts.append(_link("rootcoz", row.rootcoz_url))
 

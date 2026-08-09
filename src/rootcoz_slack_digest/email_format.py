@@ -46,7 +46,8 @@ def format_digest_html(
             ),
             reverse=True,
         )
-        html_parts.append(f"<h3>{tier}</h3>")
+        if len(sorted_tiers) > 1:
+            html_parts.append(f"<h3>{tier}</h3>")
         html_parts.append("<ul>")
         for row in tier_rows:
             name_html = (
@@ -57,9 +58,9 @@ def format_digest_html(
             rootcoz_html = f' · <a href="{row.rootcoz_url}">rootcoz</a>' if row.rootcoz_url else ""
             bundle_html = f" [{row.bundle}]" if row.bundle else ""
             html_parts.append(
-                f"<li>{name_html} — "
-                f"{row.reviewed_count} / {row.failure_count} reviewed"
-                f"{bundle_html}{rootcoz_html}</li>"
+                f"<li>{name_html}{bundle_html} "
+                f"{row.reviewed_count}/{row.failure_count} reviewed"
+                f"{rootcoz_html}</li>"
             )
         html_parts.append("</ul>")
 
