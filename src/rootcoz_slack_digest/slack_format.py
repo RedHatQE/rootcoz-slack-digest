@@ -243,7 +243,7 @@ def _build_table_blocks(
             )
 
         header_row: list[dict[str, object]] = [
-            {"type": "raw_text", "text": f"Job ({total_jobs})"},
+            {"type": "raw_text", "text": f"Jobs ({total_jobs})"},
             {"type": "raw_text", "text": "Bundle"},
             {"type": "raw_text", "text": f"Reviewed ({total_reviewed}/{total_failures})"},
             {"type": "raw_text", "text": "rootcoz"},

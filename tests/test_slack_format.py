@@ -224,7 +224,7 @@ def test_build_message_blocks_use_table() -> None:
     assert gate_table["row_header_column_index"] == 0
     assert gate_table["caption"] == "gating"
     header = gate_table["rows"][0]
-    assert [c["text"] for c in header] == ["Job (2)", "Bundle", "Reviewed (0/5)", "rootcoz"]
+    assert [c["text"] for c in header] == ["Jobs (2)", "Bundle", "Reviewed (0/5)", "rootcoz"]
     job_cell = gate_table["rows"][1][0]
     assert job_cell["type"] == "rich_text"
     link = job_cell["elements"][0]["elements"][0]
