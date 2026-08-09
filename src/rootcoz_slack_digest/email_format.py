@@ -101,13 +101,14 @@ def format_celebration_html(
     if total_jobs > 0 and jobs:
         items: list[str] = []
         for job in jobs[:20]:
+            bundle_html = f" [{html.escape(job.bundle)}]" if job.bundle else ""
             if job.rootcoz_url:
                 items.append(
                     f'<li><a href="{html.escape(job.rootcoz_url, quote=True)}">'
-                    f"{html.escape(job.job_name)}</a></li>"
+                    f"{html.escape(job.job_name)}</a>{bundle_html}</li>"
                 )
             else:
-                items.append(f"<li>{html.escape(job.job_name)}</li>")
+                items.append(f"<li>{html.escape(job.job_name)}{bundle_html}</li>")
         parts.append("<ul>" + "".join(items) + "</ul>")
         if len(jobs) > 20:
             parts.append(f"<p><em>+{len(jobs) - 20} more reviewed jobs</em></p>")

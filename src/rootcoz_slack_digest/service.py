@@ -269,12 +269,15 @@ def run_digest(
                         **template_vars,
                     )
                     shown_jobs = all_jobs[:20]
-                    link_lines = [
-                        f"• <{job.rootcoz_url}|{job.job_name}>"
-                        if job.rootcoz_url
-                        else f"• {job.job_name}"
-                        for job in shown_jobs
-                    ]
+                    link_lines: list[str] = []
+                    for job in shown_jobs:
+                        bundle_part = f" [{job.bundle}]" if job.bundle else ""
+                        if job.rootcoz_url:
+                            link_lines.append(
+                                f"• <{job.rootcoz_url}|{job.job_name}>{bundle_part}"
+                            )
+                        else:
+                            link_lines.append(f"• {job.job_name}{bundle_part}")
                     if link_lines:
                         celebrate_text += "\n" + "\n".join(link_lines)
                     if len(all_jobs) > 20:

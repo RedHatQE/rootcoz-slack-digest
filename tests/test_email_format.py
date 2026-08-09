@@ -51,8 +51,9 @@ def test_format_celebration_html_includes_job_links() -> None:
             job_id="j1",
             job_name="tier2-network",
             rootcoz_url="https://rootcoz.example/results/j1",
+            bundle="v4.22.6.rhel9-9",
         ),
-        JobRow(job_id="j2", job_name="no-link-job"),
+        JobRow(job_id="j2", job_name="no-link-job", bundle="v4.23.0.rhel9-9"),
     ]
     html = format_celebration_html(
         window=window,
@@ -63,7 +64,8 @@ def test_format_celebration_html_includes_job_links() -> None:
     )
     assert 'href="https://rootcoz.example/results/j1"' in html
     assert "tier2-network" in html
-    assert "<li>no-link-job</li>" in html
+    assert "[v4.22.6.rhel9-9]" in html
+    assert "<li>no-link-job [v4.23.0.rhel9-9]</li>" in html
 
 
 def test_format_celebration_html_truncates_links() -> None:

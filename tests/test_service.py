@@ -145,6 +145,7 @@ def test_run_digest_celebration_includes_rootcoz_links() -> None:
             job_name="tier2-network-a",
             team="network",
             rootcoz_url="https://rootcoz.example/results/j1",
+            bundle="v4.22.6.rhel9-9",
         ),
         JobRow(
             job_id="j2",
@@ -166,7 +167,7 @@ def test_run_digest_celebration_includes_rootcoz_links() -> None:
     assert len(result.target_results[0].celebration_jobs) == 2
     blob = str(result.payload)
     assert "All" in blob
-    assert "<https://rootcoz.example/results/j1|tier2-network-a>" in blob
+    assert "<https://rootcoz.example/results/j1|tier2-network-a> [v4.22.6.rhel9-9]" in blob
     assert "<https://rootcoz.example/results/j2|tier2-network-b>" in blob
 
 
@@ -185,6 +186,7 @@ def test_run_digest_email_celebration_includes_job_links() -> None:
             job_name="tier2-network",
             team="network",
             rootcoz_url="https://rootcoz.example/results/j1",
+            bundle="v4.22.6.rhel9-9",
         )
     ]
     targets = [
@@ -209,6 +211,7 @@ def test_run_digest_email_celebration_includes_job_links() -> None:
     assert "All" in html_body
     assert 'href="https://rootcoz.example/results/j1"' in html_body
     assert "tier2-network" in html_body
+    assert "[v4.22.6.rhel9-9]" in html_body
 
 
 def test_run_digest_email_celebration_uses_total_jobs() -> None:
