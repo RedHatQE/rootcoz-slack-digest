@@ -202,7 +202,14 @@ def _link_cell(url: str, text: str) -> dict[str, object]:
     }
 
 
-def _build_table_blocks(rows: list[JobRow]) -> list[dict[str, object]]:
+def _build_table_blocks(
+    rows: list[JobRow],
+    tiers: list[str] | None = None,
+    *,
+    total_jobs: int = 0,
+    total_reviewed: int = 0,
+    total_failures: int = 0,
+) -> list[dict[str, object]]:
     """Build Slack table blocks grouped by tier with links."""
     groups: dict[str, list[JobRow]] = {}
     for row in rows:
@@ -236,9 +243,9 @@ def _build_table_blocks(rows: list[JobRow]) -> list[dict[str, object]]:
             )
 
         header_row: list[dict[str, object]] = [
-            {"type": "raw_text", "text": "Job"},
+            {"type": "raw_text", "text": f"Job ({total_jobs})"},
             {"type": "raw_text", "text": "Bundle"},
-            {"type": "raw_text", "text": "Reviewed"},
+            {"type": "raw_text", "text": f"Reviewed ({total_reviewed}/{total_failures})"},
             {"type": "raw_text", "text": "rootcoz"},
         ]
 
@@ -382,13 +389,18 @@ def build_message(
         omitted_text = _safe_format(message.omitted_template, "omitted", omitted=omitted)
 
     if message.format is MessageFormat.BLOCKS:
+        table_blocks = _build_table_blocks(
+            shown,
+            tiers,
+            total_jobs=total_jobs,
+            total_reviewed=total_reviewed,
+            total_failures=total_failures,
+        )
         blocks: list[dict[str, object]] = [
             {"type": "section", "text": {"type": "mrkdwn", "text": header}},
-            {"type": "section", "text": {"type": "mrkdwn", "text": totals}},
             {"type": "divider"},
+            *table_blocks,
         ]
-        if shown:
-            blocks.extend(_build_table_blocks(shown))
         if omitted_text:
             blocks.append(
                 {
