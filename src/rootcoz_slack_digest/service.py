@@ -194,6 +194,8 @@ def run_digest(
 
     all_rows: list[JobRow] = []
     target_results: list[TargetResult] = []
+    # "other" is a display catch-all, not a real rootcoz label
+    api_labels = [t for t in cfg.digest.tiers if t != "other"] if cfg.digest.tiers else None
     try:
         for target in resolved_targets:
             if rows is None:
@@ -201,7 +203,7 @@ def run_digest(
                 target_rows = client.fetch_job_rows(
                     window,
                     team=target.team,
-                    labels=cfg.digest.tiers or None,
+                    labels=api_labels or None,
                     exclude_labels=cfg.digest.exclude_labels or None,
                 )
                 if cfg.digest.exclude_job_patterns:
@@ -228,7 +230,7 @@ def run_digest(
                     total_jobs = client.count_all_jobs(
                         window,
                         team=target.team,
-                        labels=cfg.digest.tiers or None,
+                        labels=api_labels or None,
                         exclude_labels=cfg.digest.exclude_labels or None,
                     )
 

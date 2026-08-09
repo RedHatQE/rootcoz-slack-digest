@@ -13,7 +13,7 @@ timezone = "UTC"
 # 0 = no limit (show all jobs). Positive N truncates the Slack message.
 max_rows = 0
 sort_by = "not_reviewed" # not_reviewed | failures | job_name
-# Passed as API ``label`` query params (server-side). One API call per TARGETS team.
+# API labels to include. "other" is a display catch-all (not sent to API).
 tiers = ["gating", "release-checklist", "other"]
 # Column order controls the Slack table (API fields only).
 columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]

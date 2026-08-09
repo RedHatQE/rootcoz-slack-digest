@@ -13,9 +13,10 @@ data:
     timezone = "UTC"
 
     [digest]
-    # 0 = no limit. tiers / exclude_labels are API query params; exclude_job_patterns is client-side name filter.
+    # 0 = no limit. exclude_labels are API query params; exclude_job_patterns is client-side name filter.
     max_rows = 0
     sort_by = "not_reviewed"
+    # API labels to include. "other" is a display catch-all (not sent to API).
     tiers = ["gating", "release-checklist", "other"]
     columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
     exclude_labels = ["s390x"]
