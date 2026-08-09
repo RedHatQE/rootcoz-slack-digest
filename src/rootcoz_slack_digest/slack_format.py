@@ -398,7 +398,6 @@ def build_message(
         )
         blocks: list[dict[str, object]] = [
             {"type": "section", "text": {"type": "mrkdwn", "text": header}},
-            {"type": "divider"},
             *table_blocks,
         ]
         if omitted_text:

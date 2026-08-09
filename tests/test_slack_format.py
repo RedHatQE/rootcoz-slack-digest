@@ -213,10 +213,11 @@ def test_build_message_blocks_use_table() -> None:
     )
     assert isinstance(payload, list)
     types = [b.get("type") for b in payload]
-    assert types[:2] == ["section", "divider"]
+    assert types[0] == "section"
+    assert "divider" not in types
     tables = [b for b in payload if b.get("type") == "data_table"]
     assert len(tables) == 2
-    # Tier headers between divider and tables when multiple tiers
+    # Tier headers before tables when multiple tiers
     assert "*gating*" in str(payload)
     assert "*other*" in str(payload)
     gate_table = tables[0]
