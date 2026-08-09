@@ -72,10 +72,13 @@ def test_build_message_blocks_no_html_summary() -> None:
     )
     assert isinstance(payload, list)
     blob = str(payload)
-    # Mention is a context block (mrkdwn)
+    # Header title + mention in a section block (mrkdwn)
     assert payload[0] == {
-        "type": "context",
-        "elements": [{"type": "mrkdwn", "text": "<!subteam^S1>"}],
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": "*rootcoz  weekly digest* — Jul 26 – Aug 01, 2026 — <!subteam^S1>",
+        },
     }
     tables = [b for b in payload if b.get("type") == "table"]
     assert tables

@@ -396,16 +396,9 @@ def build_message(
             total_failures=total_failures,
         )
 
-        blocks: list[dict[str, object]] = []
-
-        # Mention in context block (mrkdwn) so <!subteam^...> renders
-        if message.include_mentions and mention:
-            blocks.append(
-                {
-                    "type": "context",
-                    "elements": [{"type": "mrkdwn", "text": mention}],
-                }
-            )
+        blocks: list[dict[str, object]] = [
+            {"type": "section", "text": {"type": "mrkdwn", "text": header}},
+        ]
 
         blocks.extend(table_blocks)
 
