@@ -135,6 +135,15 @@ class MessageConfig(BaseModel):
     )
     omitted_template: str = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
     table_code_fence: bool = True
+    celebration_reviewed_template: str = (
+        "🎉 *rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}\n\n"
+        "✅ All *{total_jobs}* {lanes} failures for *{team}* have been reviewed! 👏"
+    )
+    celebration_no_failures_template: str = (
+        "🎉 *rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}\n\n"
+        "✅ Zero {lanes} failures for *{team}* this week! 🚀"
+    )
+    email_subject_template: str = "rootcoz {lanes} weekly digest — {week_label} — {team}"
 
 
 class FieldMapConfig(BaseModel):
@@ -154,10 +163,11 @@ class FieldMapConfig(BaseModel):
     rootcoz: str = "{url}/results/{job_id}"
     created_at: str = "created_at"
     tags: str = "tags"  # raw tags array path
+    bundle_pattern: str = r"v\d+\.\d+\."
 
 
 class TierLabelsConfig(BaseModel):
-    """Map API label values → display tier names. Unmatched → 'other'."""
+    """Map API label values → display tier names. Unmatched → ``default_tier``."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -167,13 +177,19 @@ class TierLabelsConfig(BaseModel):
             "release-checklist": "release-checklist",
         }
     )
+    default_tier: str = "other"
 
     @model_validator(mode="before")
     @classmethod
     def _wrap_flat_labels(cls, value: Any) -> Any:
         """Accept flat TOML ``[rootcoz.tier_labels] key = value`` as ``labels``."""
         if isinstance(value, dict) and "labels" not in value:
-            return {"labels": value}
+            known = {"default_tier"}
+            labels = {k: v for k, v in value.items() if k not in known}
+            wrapped: dict[str, Any] = {"labels": labels}
+            if "default_tier" in value:
+                wrapped["default_tier"] = value["default_tier"]
+            return wrapped
         return value
 
     @field_validator("labels", mode="before")

@@ -89,7 +89,11 @@ class RootcozClient:
             version = str(resolve_path(job, fm.version) or "")
 
             tier_raw = resolve_path(job, fm.tier)
-            tier = extract_tier(tier_raw, self._config.tier_labels.labels)
+            tier = extract_tier(
+                tier_raw,
+                self._config.tier_labels.labels,
+                self._config.tier_labels.default_tier,
+            )
 
             build_raw = resolve_path(job, fm.build)
             try:
@@ -123,7 +127,7 @@ class RootcozClient:
             if isinstance(raw_tags, list):
                 for tag in raw_tags:
                     tag_str = str(tag)
-                    if re.match(r"v\d+\.\d+\.", tag_str):
+                    if re.match(fm.bundle_pattern, tag_str):
                         bundle = tag_str
                         break
 

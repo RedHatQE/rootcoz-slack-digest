@@ -30,6 +30,8 @@ data:
     omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
     # table_code_fence only applies to plain format; blocks/mrkdwn use grouped-by-tier links.
     table_code_fence = true
+    # Optional overrides (defaults match MessageConfig):
+    # celebration_reviewed_template / celebration_no_failures_template / email_subject_template
 
     [rootcoz]
     endpoint = "/api/dashboard/filtered"
@@ -49,10 +51,12 @@ data:
     jenkins = "jenkins_url"
     rootcoz = "{url}/results/{job_id}"
     tags = "tags"
+    # bundle_pattern = "v\\d+\\.\\d+\\."
 
     [rootcoz.tier_labels]
     gating = "gating"
     release-checklist = "release-checklist"
+    # default_tier = "other"
 
     [slack]
     mode = "bot"

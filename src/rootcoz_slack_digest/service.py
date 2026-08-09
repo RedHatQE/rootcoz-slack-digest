@@ -194,8 +194,9 @@ def run_digest(
 
     all_rows: list[JobRow] = []
     target_results: list[TargetResult] = []
-    # "other" is a display catch-all, not a real rootcoz label
-    api_labels = [t for t in cfg.digest.tiers if t != "other"] if cfg.digest.tiers else None
+    # default_tier is a display catch-all, not a real rootcoz label
+    default_tier = cfg.rootcoz.tier_labels.default_tier
+    api_labels = [t for t in cfg.digest.tiers if t != default_tier] if cfg.digest.tiers else None
     try:
         for target in resolved_targets:
             if rows is None:
@@ -239,22 +240,23 @@ def run_digest(
                     mention = mention_for_handle(resolver, usergroup)
                 mention_suffix = f" — {mention}" if mention else ""
 
-                # Build tier display string
                 tier_display = ", ".join(cfg.digest.tiers) if cfg.digest.tiers else "all tiers"
+                template_vars = {
+                    "week_label": window.label,
+                    "mention_suffix": mention_suffix,
+                    "mention": mention,
+                    "team": target.team,
+                    "total_jobs": str(total_jobs),
+                    "lanes": tier_display,
+                }
 
                 if total_jobs > 0:
-                    # All failures were reviewed!
-                    celebrate_text = (
-                        f"🎉 *rootcoz weekly digest* — {window.label}{mention_suffix}\n\n"
-                        f"✅ All *{total_jobs}* {tier_display} failures for "
-                        f"*{target.team}* have been reviewed! 👏"
+                    celebrate_text = cfg.message.celebration_reviewed_template.format(
+                        **template_vars
                     )
                 else:
-                    # No failures at all!
-                    celebrate_text = (
-                        f"🎉 *rootcoz weekly digest* — {window.label}{mention_suffix}\n\n"
-                        f"✅ Zero {tier_display} failures for "
-                        f"*{target.team}* this week! 🚀"
+                    celebrate_text = cfg.message.celebration_no_failures_template.format(
+                        **template_vars
                     )
 
                 if cfg.message.format is MessageFormat.BLOCKS:
@@ -361,7 +363,12 @@ def run_digest(
         for tr in target_results:
             if tr.target.email is None:
                 continue
-            subject = f"rootcoz weekly digest — {window.label} — {tr.target.team}"
+            tier_display = ", ".join(cfg.digest.tiers) if cfg.digest.tiers else "all"
+            subject = cfg.message.email_subject_template.format(
+                week_label=window.label,
+                team=tr.target.team,
+                lanes=tier_display,
+            )
             if tr.rows:
                 html = format_digest_html(
                     window=window,

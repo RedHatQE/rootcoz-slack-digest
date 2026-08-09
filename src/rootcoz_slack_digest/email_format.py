@@ -5,8 +5,6 @@ from __future__ import annotations
 from rootcoz_slack_digest.models import JobRow, WeekWindow
 from rootcoz_slack_digest.slack_format import _version_sort_key
 
-_TIER_ORDER = {"gating": 0, "release-checklist": 1}
-
 
 def format_digest_html(
     *,
@@ -23,7 +21,8 @@ def format_digest_html(
     groups: dict[str, list[JobRow]] = {}
     for row in rows:
         groups.setdefault(row.tier, []).append(row)
-    sorted_tiers = sorted(groups.keys(), key=lambda t: (_TIER_ORDER.get(t, 99), t))
+    tier_order = {t: i for i, t in enumerate(tiers)} if tiers else {}
+    sorted_tiers = sorted(groups.keys(), key=lambda t: (tier_order.get(t, 99), t))
 
     html_parts = [
         "<html><body style='font-family: Arial, sans-serif; font-size: 14px;'>",

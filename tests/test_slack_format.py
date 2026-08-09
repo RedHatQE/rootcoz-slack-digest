@@ -128,6 +128,7 @@ def test_grouped_by_tier_order_and_links() -> None:
         sort_by=SortBy.JOB_NAME,
         columns=list(DigestColumn),
         message=MessageConfig(format=MessageFormat.MRKDWN),
+        tiers=["gating", "release-checklist", "other"],
     )
     assert isinstance(payload, str)
     gating_idx = payload.index("*gating*")

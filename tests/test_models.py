@@ -7,8 +7,11 @@ from pydantic import ValidationError
 
 from rootcoz_slack_digest.models import (
     EmailTargetConfig,
+    FieldMapConfig,
+    MessageConfig,
     SlackTargetConfig,
     Target,
+    TierLabelsConfig,
     load_config,
 )
 
@@ -42,3 +45,20 @@ def test_target_accepts_nested_slack_and_email() -> None:
     assert t.slack.channel == "C1"
     assert t.email is not None
     assert t.email.recipients == ["a@example.com"]
+
+
+def test_tier_labels_flat_toml_keeps_default_tier() -> None:
+    cfg = TierLabelsConfig.model_validate(
+        {"gating": "gating", "release-checklist": "rc", "default_tier": "misc"}
+    )
+    assert cfg.default_tier == "misc"
+    assert cfg.labels == {"gating": "gating", "release-checklist": "rc"}
+    assert "default_tier" not in cfg.labels
+
+
+def test_message_and_field_map_configurable_defaults() -> None:
+    msg = MessageConfig()
+    assert "{lanes}" in msg.celebration_reviewed_template
+    assert "{lanes}" in msg.celebration_no_failures_template
+    assert msg.email_subject_template.startswith("rootcoz")
+    assert FieldMapConfig().bundle_pattern == r"v\d+\.\d+\."

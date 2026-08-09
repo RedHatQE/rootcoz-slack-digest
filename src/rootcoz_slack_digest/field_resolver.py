@@ -43,19 +43,19 @@ def resolve_template(template: str, fields: dict[str, str], config_vars: dict[st
         return "".join(result)
 
 
-def extract_tier(value: Any, tier_labels: dict[str, str]) -> str:
+def extract_tier(value: Any, tier_labels: dict[str, str], default: str = "other") -> str:
     """Extract display tier from a field value.
 
     If value is a list, find the first item matching a tier_labels key.
     If value is a string, look it up directly.
-    Unmatched → 'other'.
+    Unmatched → ``default``.
     """
     if isinstance(value, list):
         for item in value:
             item_str = str(item)
             if item_str in tier_labels:
                 return tier_labels[item_str]
-        return "other"
+        return default
     if isinstance(value, str):
-        return tier_labels.get(value, value or "other")
-    return "other"
+        return tier_labels.get(value, value or default)
+    return default

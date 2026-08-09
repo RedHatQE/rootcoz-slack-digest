@@ -38,6 +38,12 @@ row_template = "• *{job_name}* ({tier}) — fail {failures} / rev {reviewed}{j
 omitted_template = "_+{omitted} more jobs not shown (raise digest.max_rows)._"
 # table_code_fence only applies to plain format; blocks/mrkdwn use grouped-by-tier links.
 table_code_fence = true
+# Celebration when a target has no open failures. Placeholders:
+# {week_label}, {mention_suffix}, {mention}, {team}, {total_jobs}, {lanes}
+# celebration_reviewed_template = "🎉 *rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}\n\n✅ All *{total_jobs}* {lanes} failures for *{team}* have been reviewed! 👏"
+# celebration_no_failures_template = "🎉 *rootcoz {lanes} weekly digest* — {week_label}{mention_suffix}\n\n✅ Zero {lanes} failures for *{team}* this week! 🚀"
+# Email subject. Placeholders: {lanes}, {week_label}, {team}
+# email_subject_template = "rootcoz {lanes} weekly digest — {week_label} — {team}"
 
 [rootcoz]
 # Prefer env: ROOTCOZ_URL, ROOTCOZ_API_KEY, ROOTCOZ_VERIFY_SSL
@@ -66,13 +72,16 @@ build = "build_number"
 jenkins = "jenkins_url"
 rootcoz = "{url}/results/{job_id}"
 tags = "tags"
+# Regex matched against each tags[] entry to pick the bundle version string.
+# bundle_pattern = "v\\d+\\.\\d+\\."
 
 # Map API label values → display tier names.
 # When tier field is a list, first matching label wins.
-# Unmatched values default to "other".
+# Unmatched values default to default_tier.
 [rootcoz.tier_labels]
 gating = "gating"
 release-checklist = "release-checklist"
+# default_tier = "other"
 
 [slack]
 # Prefer bot mode for usergroup mentions (<!subteam^ID>).

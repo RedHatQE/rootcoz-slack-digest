@@ -99,6 +99,7 @@ def format_rows_text(
     message: MessageConfig,
     *,
     mrkdwn: bool,
+    tiers: list[str] | None = None,
 ) -> str:
     """Render job rows grouped by tier with inline links (mrkdwn) or as a table."""
     if not rows:
@@ -109,7 +110,7 @@ def format_rows_text(
         )
 
     if mrkdwn:
-        return _format_grouped_by_tier(rows)
+        return _format_grouped_by_tier(rows, tiers)
 
     # Plain/non-mrkdwn: keep the column table
     if message.table_code_fence and columns:
@@ -117,10 +118,6 @@ def format_rows_text(
 
     lines = [_safe_format(message.row_template, "row", **_row_template_vars(row)) for row in rows]
     return "\n".join(lines)
-
-
-# Tier display order: gating first, then release-checklist, then everything else
-_TIER_ORDER = {"gating": 0, "release-checklist": 1}
 
 
 def _version_sort_key(version: str) -> tuple[int, ...]:
@@ -144,19 +141,20 @@ def _version_sort_key(version: str) -> tuple[int, ...]:
     return tuple(parts)
 
 
-def _format_grouped_by_tier(rows: list[JobRow]) -> str:
+def _format_grouped_by_tier(rows: list[JobRow], tiers: list[str] | None = None) -> str:
     """Format rows grouped by tier with inline mrkdwn links.
 
-    Order: gating → release-checklist → other tiers alphabetically.
+    Order follows ``tiers`` config when provided; unknown tiers sort after, alphabetically.
     Within each tier, sorted by bundle descending, then failure_count descending.
     """
     groups: dict[str, list[JobRow]] = {}
     for row in rows:
         groups.setdefault(row.tier, []).append(row)
 
+    tier_order = {t: i for i, t in enumerate(tiers)} if tiers else {}
     sorted_tiers = sorted(
         groups.keys(),
-        key=lambda t: (_TIER_ORDER.get(t, 99), t),
+        key=lambda t: (tier_order.get(t, 99), t),
     )
 
     sections: list[str] = []
@@ -215,9 +213,10 @@ def _build_table_blocks(
     for row in rows:
         groups.setdefault(row.tier, []).append(row)
 
+    tier_order = {t: i for i, t in enumerate(tiers)} if tiers else {}
     sorted_tiers = sorted(
         groups.keys(),
-        key=lambda t: (_TIER_ORDER.get(t, 99), t),
+        key=lambda t: (tier_order.get(t, 99), t),
     )
 
     blocks: list[dict[str, object]] = []
@@ -412,7 +411,7 @@ def build_message(
         return blocks
 
     mrkdwn = message.format is not MessageFormat.PLAIN
-    body = format_rows_text(shown, columns, message, mrkdwn=mrkdwn)
+    body = format_rows_text(shown, columns, message, mrkdwn=mrkdwn, tiers=tiers)
     parts = [header, totals, body]
     if omitted_text:
         parts.append(omitted_text)
@@ -463,7 +462,7 @@ def blocks_to_fallback_text(blocks: list[dict[str, object]]) -> str:
             for el in elements:
                 if isinstance(el, dict) and "text" in el:
                     parts.append(str(el["text"]))
-    return "\n".join(parts) if parts else "rootcoz weekly digest"
+    return "\n".join(parts) if parts else "weekly digest"
 
 
 def payload_fallback_text(payload: list[dict[str, object]] | str) -> str:

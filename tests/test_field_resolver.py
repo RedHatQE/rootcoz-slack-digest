@@ -47,3 +47,9 @@ def test_extract_tier_string() -> None:
 
 def test_extract_tier_none() -> None:
     assert extract_tier(None, {}) == "other"
+
+
+def test_extract_tier_custom_default() -> None:
+    assert extract_tier(["unknown"], {}, default="misc") == "misc"
+    assert extract_tier(None, {}, default="misc") == "misc"
+    assert extract_tier("", {}, default="misc") == "misc"
