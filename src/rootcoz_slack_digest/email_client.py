@@ -40,9 +40,15 @@ class EmailClient:
         msg.attach(MIMEText(html_body, "html"))
 
         all_recipients = list(recipients) + (cc or [])
-        with smtplib.SMTP(self._config.smtp_host, self._config.smtp_port, timeout=30) as server:
+        with smtplib.SMTP(
+            self._config.smtp_host,
+            self._config.smtp_port,
+            timeout=self._config.timeout,
+        ) as server:
             if self._config.use_tls:
                 server.starttls()
+            if self._config.smtp_username:
+                server.login(self._config.smtp_username, self._config.smtp_password)
             server.sendmail(self._config.from_address, all_recipients, msg.as_string())
 
         logger.info("Sent digest email to %s", ", ".join(recipients))

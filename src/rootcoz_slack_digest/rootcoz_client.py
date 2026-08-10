@@ -42,7 +42,7 @@ class RootcozClient:
             base_url=config.url.rstrip("/"),
             headers={"Authorization": f"Bearer {config.api_key}"},
             verify=config.verify_ssl,
-            timeout=60.0,
+            timeout=float(config.timeout),
         )
 
     def close(self) -> None:

@@ -24,7 +24,7 @@ class SlackClient:
     ) -> None:
         self._config = config
         self._owns_client = client is None
-        self._client = client or httpx.Client(timeout=30.0)
+        self._client = client or httpx.Client(timeout=float(config.timeout))
 
     def close(self) -> None:
         """Close the owned HTTP client."""
@@ -84,8 +84,9 @@ class SlackClient:
         }
         if blocks is not None:
             payload["blocks"] = blocks
+        api_url = f"{self._config.api_base_url.rstrip('/')}/chat.postMessage"
         resp = self._client.post(
-            "https://slack.com/api/chat.postMessage",
+            api_url,
             headers={"Authorization": f"Bearer {self._config.bot_token}"},
             json=payload,
         )

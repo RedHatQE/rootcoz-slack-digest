@@ -157,7 +157,7 @@ def run_digest(
     if date_from is not None and date_to is not None:
         window = week_from_dates(date_from, date_to)
     else:
-        window = last_complete_week()
+        window = last_complete_week(week_start=cfg.schedule.week_start)
 
     resolved_targets = targets if targets is not None else _load_targets()
     if not resolved_targets:
@@ -187,7 +187,11 @@ def run_digest(
     )
     if needs_mentions and resolver is None:
         if cfg.slack.bot_token:
-            resolver = SlackUsergroupResolver(cfg.slack.bot_token)
+            resolver = SlackUsergroupResolver(
+                cfg.slack.bot_token,
+                api_base_url=cfg.slack.api_base_url,
+                timeout=cfg.slack.timeout,
+            )
             own_resolver = True
         else:
             logger.warning("No bot token; cannot resolve usergroup mentions — posting without CC")
@@ -278,7 +282,8 @@ def run_digest(
                         "celebration_reviewed",
                         **template_vars,
                     )
-                    shown_jobs = all_jobs[:20]
+                    max_links = cfg.message.celebration_max_links
+                    shown_jobs = all_jobs[:max_links]
                     link_lines: list[str] = []
                     for job in shown_jobs:
                         bundle_part = f" [{job.bundle}]" if job.bundle else ""
@@ -288,8 +293,12 @@ def run_digest(
                             link_lines.append(f"• {job.job_name}{bundle_part}")
                     if link_lines:
                         celebrate_text += "\n" + "\n".join(link_lines)
-                    if len(all_jobs) > 20:
-                        celebrate_text += f"\n_+{len(all_jobs) - 20} more reviewed jobs_"
+                    if len(all_jobs) > max_links:
+                        celebrate_text += "\n" + _safe_format(
+                            cfg.message.celebration_more_template,
+                            "celebration_more",
+                            remaining=len(all_jobs) - max_links,
+                        )
                 else:
                     celebrate_text = _safe_format(
                         cfg.message.celebration_no_failures_template,
@@ -406,6 +415,7 @@ def run_digest(
                     rows=tr.rows,
                     team=tr.target.team,
                     tiers=tiers,
+                    message=cfg.message,
                 )
             else:
                 html = format_celebration_html(
@@ -414,6 +424,7 @@ def run_digest(
                     total_jobs=tr.total_jobs,
                     tiers=tiers,
                     jobs=tr.celebration_jobs,
+                    message=cfg.message,
                 )
             logger.info(
                 "Sending digest email for team %s to %s",

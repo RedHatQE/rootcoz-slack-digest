@@ -4,8 +4,15 @@ from __future__ import annotations
 
 import html
 
-from rootcoz_slack_digest.models import JobRow, WeekWindow
+from rootcoz_slack_digest.models import JobRow, MessageConfig, WeekWindow
 from rootcoz_slack_digest.utils import version_sort_key
+
+
+def _safe_href(url: str) -> str:
+    """Only allow http/https URLs in href attributes."""
+    if url and url.startswith(("http://", "https://")):
+        return html.escape(url, quote=True)
+    return ""
 
 
 def format_digest_html(
@@ -14,8 +21,10 @@ def format_digest_html(
     rows: list[JobRow],
     team: str,
     tiers: list[str] | None = None,
+    message: MessageConfig | None = None,
 ) -> str:
     """Render digest rows as styled HTML email body."""
+    msg = message or MessageConfig()
     total_failures = sum(r.failure_count for r in rows)
     total_reviewed = sum(r.reviewed_count for r in rows)
     tier_display = ", ".join(html.escape(t) for t in tiers) if tiers else "all"
@@ -29,7 +38,7 @@ def format_digest_html(
 
     html_parts = [
         "<html><body style='font-family: Arial, sans-serif; font-size: 14px;'>",
-        f"<h2>rootcoz weekly digest — {html.escape(window.label)}</h2>",
+        f"<h2>{html.escape(msg.email_body_title)} — {html.escape(window.label)}</h2>",
         f"<p><strong>Team:</strong> {team_html} · "
         f"<strong>Tiers:</strong> {tier_display} · "
         f"<strong>Jobs:</strong> {len(rows)} · "
@@ -53,15 +62,13 @@ def format_digest_html(
         html_parts.append("<ul>")
         for row in tier_rows:
             job_name = html.escape(row.job_name)
-            if row.jenkins_url:
-                name_html = f'<a href="{html.escape(row.jenkins_url, quote=True)}">{job_name}</a>'
+            href = _safe_href(row.jenkins_url)
+            if href:
+                name_html = f'<a href="{href}">{job_name}</a>'
             else:
                 name_html = f"<strong>{job_name}</strong>"
-            rootcoz_html = (
-                f' · <a href="{html.escape(row.rootcoz_url, quote=True)}">rootcoz</a>'
-                if row.rootcoz_url
-                else ""
-            )
+            rootcoz_href = _safe_href(row.rootcoz_url)
+            rootcoz_html = f' · <a href="{rootcoz_href}">rootcoz</a>' if rootcoz_href else ""
             bundle_html = f" [{html.escape(row.bundle)}]" if row.bundle else ""
             html_parts.append(
                 f"<li>{name_html}{bundle_html} "
@@ -81,36 +88,44 @@ def format_celebration_html(
     total_jobs: int,
     tiers: list[str] | None = None,
     jobs: list[JobRow] | None = None,
+    message: MessageConfig | None = None,
 ) -> str:
     """Render celebration message as HTML."""
+    msg = message or MessageConfig()
     tier_display = ", ".join(html.escape(t) for t in tiers) if tiers else "all"
     team_html = html.escape(team)
     if total_jobs > 0:
-        body = (
-            f"All <strong>{total_jobs}</strong> {tier_display} failures "
-            f"for <strong>{team_html}</strong> have been reviewed! 👏"
+        body = msg.email_celebration_reviewed_template.format(
+            total_jobs=total_jobs,
+            lanes=tier_display,
+            team=team_html,
         )
     else:
-        body = f"Zero {tier_display} failures for <strong>{team_html}</strong> this week! 🚀"
+        body = msg.email_celebration_no_failures_template.format(
+            lanes=tier_display,
+            team=team_html,
+        )
 
     parts = [
         "<html><body style='font-family: Arial, sans-serif;'>",
-        f"<h2>🎉 rootcoz weekly digest — {html.escape(window.label)}</h2>",
+        f"<h2>🎉 {html.escape(msg.email_body_title)} — {html.escape(window.label)}</h2>",
         f"<p>✅ {body}</p>",
     ]
+    max_links = msg.celebration_max_links
     if total_jobs > 0 and jobs:
         items: list[str] = []
-        for job in jobs[:20]:
+        for job in jobs[:max_links]:
             bundle_html = f" [{html.escape(job.bundle)}]" if job.bundle else ""
-            if job.rootcoz_url:
+            href = _safe_href(job.rootcoz_url)
+            if href:
                 items.append(
-                    f'<li><a href="{html.escape(job.rootcoz_url, quote=True)}">'
-                    f"{html.escape(job.job_name)}</a>{bundle_html}</li>"
+                    f'<li><a href="{href}">{html.escape(job.job_name)}</a>{bundle_html}</li>'
                 )
             else:
                 items.append(f"<li>{html.escape(job.job_name)}{bundle_html}</li>")
         parts.append("<ul>" + "".join(items) + "</ul>")
-        if len(jobs) > 20:
-            parts.append(f"<p><em>+{len(jobs) - 20} more reviewed jobs</em></p>")
+        if len(jobs) > max_links:
+            remaining = len(jobs) - max_links
+            parts.append(f"<p><em>+{remaining} more reviewed jobs</em></p>")
     parts.append("</body></html>")
     return "\n".join(parts)

@@ -3,6 +3,7 @@
 from datetime import date
 
 from rootcoz_slack_digest.models import (
+    DEFAULT_BLOCK_COLUMNS,
     DigestColumn,
     JobRow,
     MessageConfig,
@@ -59,14 +60,7 @@ def test_build_message_blocks_no_html_summary() -> None:
         rows=rows,
         max_rows=2,
         sort_by=SortBy.NOT_REVIEWED,
-        columns=[
-            DigestColumn.JOB_NAME,
-            DigestColumn.TIER,
-            DigestColumn.FAILURES,
-            DigestColumn.REVIEWED,
-            DigestColumn.JENKINS,
-            DigestColumn.ROOTCOZ,
-        ],
+        columns=list(DEFAULT_BLOCK_COLUMNS),
         message=MessageConfig(),
         mention="<!subteam^S1>",
     )
@@ -125,7 +119,7 @@ def test_grouped_by_tier_order_and_links() -> None:
         window=window,
         rows=rows,
         max_rows=10,
-        sort_by=SortBy.JOB_NAME,
+        sort_by=SortBy.FAILURES,
         columns=list(DigestColumn),
         message=MessageConfig(format=MessageFormat.MRKDWN),
         tiers=["gating", "release-checklist", "other"],
@@ -135,7 +129,7 @@ def test_grouped_by_tier_order_and_links() -> None:
     rc_idx = payload.index("*release-checklist*")
     other_idx = payload.index("*other*")
     assert gating_idx < rc_idx < other_idx
-    # Within gating: higher failures first
+    # Within gating: higher failures first (sort_by=failures)
     assert payload.index("gate-high") < payload.index("gate-low")
     assert "<https://jenkins.example/job/gate-high/1/|gate-high>" in payload
     assert "0/23 reviewed · <https://rootcoz.example/results/gate-high|rootcoz>" in payload
@@ -154,7 +148,7 @@ def test_grouped_by_tier_sorts_by_version_then_bundle_then_failures() -> None:
         window=window,
         rows=rows,
         max_rows=10,
-        sort_by=SortBy.JOB_NAME,
+        sort_by=SortBy.FAILURES,
         columns=list(DigestColumn),
         message=MessageConfig(format=MessageFormat.MRKDWN),
     )
@@ -210,13 +204,7 @@ def test_build_message_blocks_use_table() -> None:
         rows=rows,
         max_rows=10,
         sort_by=SortBy.JOB_NAME,
-        columns=[
-            DigestColumn.JOB_NAME,
-            DigestColumn.FAILURES,
-            DigestColumn.REVIEWED,
-            DigestColumn.JENKINS,
-            DigestColumn.ROOTCOZ,
-        ],
+        columns=list(DEFAULT_BLOCK_COLUMNS),
         message=MessageConfig(format=MessageFormat.BLOCKS),
     )
     assert isinstance(payload, list)

@@ -31,6 +31,19 @@ def test_last_complete_week_on_saturday_uses_previous_week() -> None:
     assert window.date_to == date(2026, 7, 25)
 
 
+def test_last_complete_week_monday_start() -> None:
+    # Wednesday 2026-08-05 → last complete Mon–Sun is Jul 27 – Aug 2
+    as_of = datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
+    window = last_complete_week(as_of=as_of, week_start="monday")
+    assert window.date_from == date(2026, 7, 27)
+    assert window.date_to == date(2026, 8, 2)
+
+
+def test_last_complete_week_rejects_bad_week_start() -> None:
+    with pytest.raises(ValueError, match="week_start"):
+        last_complete_week(week_start="friday")
+
+
 def test_week_from_dates_rejects_inverted_range() -> None:
     with pytest.raises(ValueError, match="date_to"):
         week_from_dates(date(2026, 8, 2), date(2026, 8, 1))

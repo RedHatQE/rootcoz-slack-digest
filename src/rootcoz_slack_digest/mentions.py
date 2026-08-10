@@ -44,8 +44,17 @@ def mention_for_handle(resolver: UsergroupResolver, handle: str | None) -> str:
 class SlackUsergroupResolver:
     """Resolve handles via ``usergroups.list`` (cached for one run)."""
 
-    def __init__(self, token: str, *, client: httpx.Client | None = None) -> None:
+    def __init__(
+        self,
+        token: str,
+        *,
+        api_base_url: str = "https://slack.com/api",
+        timeout: int = 30,
+        client: httpx.Client | None = None,
+    ) -> None:
         self._token = token
+        self._api_base_url = api_base_url.rstrip("/")
+        self._timeout = timeout
         self._client = client
         self._owns_client = client is None
         self._cache: dict[str, str] | None = None
@@ -65,9 +74,9 @@ class SlackUsergroupResolver:
     def _http(self) -> httpx.Client:
         if self._client is None:
             self._client = httpx.Client(
-                base_url="https://slack.com/api",
+                base_url=self._api_base_url,
                 headers={"Authorization": f"Bearer {self._token}"},
-                timeout=30.0,
+                timeout=float(self._timeout),
             )
         return self._client
 

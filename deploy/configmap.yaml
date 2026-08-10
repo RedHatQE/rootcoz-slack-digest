@@ -10,7 +10,8 @@ data:
     [schedule]
     # Week window is always the last complete Sun–Sat in UTC.
     cron = "0 10 * * 0"
-    timezone = "Asia/Jerusalem"
+    timezone = "UTC"
+    week_start = "sunday"
 
     [digest]
     # 0 = no limit. exclude_labels are API query params; exclude_job_patterns is client-side name filter.
@@ -18,11 +19,11 @@ data:
     sort_by = "not_reviewed"
     # API labels to include. "other" is a display catch-all (not sent to API).
     tiers = ["gating", "release-checklist", "other"]
-    columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
-    exclude_labels = ["s390x"]
-    exclude_job_patterns = ["s390x"]
-    exclude_versions = ["4.99", "5.99", "5.0", "4.23"]
-    include_tags = ["rootcoz-jenkins-bot"]
+    columns = ["job_name", "bundle", "reviewed", "rootcoz"]
+    exclude_labels = ["REPLACE"]
+    exclude_job_patterns = ["REPLACE"]
+    exclude_versions = ["REPLACE"]
+    include_tags = ["REPLACE"]
 
     [message]
     format = "blocks"
@@ -68,19 +69,19 @@ data:
     smtp_host = "smtp.example.com"
     smtp_port = 25
     from_address = "digest@example.com"
-    use_tls = false
+    use_tls = true
   ROOTCOZ_URL: "REPLACE"
   ROOTCOZ_VERIFY_SSL: "true"
   TARGETS: |
     [
       {
-        "team": "virt-node",
-        "slack": {"channel": "REPLACE", "usergroup": "virt-node-qe"},
+        "team": "REPLACE_TEAM",
+        "slack": {"channel": "REPLACE", "usergroup": "REPLACE"},
         "email": {"recipients": ["REPLACE@example.com"]}
       },
       {
-        "team": "network",
-        "slack": {"channel": "REPLACE", "usergroup": "network-qe"},
+        "team": "REPLACE_TEAM_2",
+        "slack": {"channel": "REPLACE", "usergroup": "REPLACE"},
         "email": {"recipients": ["REPLACE@example.com"]}
       }
     ]

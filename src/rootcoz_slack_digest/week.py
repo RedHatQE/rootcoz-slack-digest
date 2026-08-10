@@ -7,15 +7,37 @@ from datetime import UTC, date, datetime, timedelta
 from rootcoz_slack_digest.models import WeekWindow
 
 
-def last_complete_week(*, as_of: datetime | None = None) -> WeekWindow:
-    """Return the most recent complete Sun–Sat week.
+def last_complete_week(
+    *,
+    as_of: datetime | None = None,
+    week_start: str = "sunday",
+) -> WeekWindow:
+    """Return the most recent complete week.
 
-    If today is Saturday, the current week is incomplete — return the previous one.
-    If today is Sunday, today starts a new week — return the previous Sun–Sat.
+    ``week_start``:
+    - ``sunday`` (default): last complete Sun–Sat
+    - ``monday``: last complete Mon–Sun
+
+    If today is the week-end day, the current week is incomplete — return the previous one.
+    If today is the week-start day, today starts a new week — return the previous complete week.
     """
     now = as_of or datetime.now(tz=UTC)
     now = now.replace(tzinfo=UTC) if now.tzinfo is None else now.astimezone(UTC)
     today = now.date()
+
+    normalized = week_start.strip().lower()
+    if normalized == "monday":
+        # Week ends on Sunday (weekday 6)
+        days_since_sunday = (today.weekday() - 6) % 7
+        if days_since_sunday == 0:
+            days_since_sunday = 7
+        last_sunday = today - timedelta(days=days_since_sunday)
+        last_monday = last_sunday - timedelta(days=6)
+        return WeekWindow(date_from=last_monday, date_to=last_sunday)
+
+    if normalized != "sunday":
+        msg = f"week_start must be 'sunday' or 'monday', got {week_start!r}"
+        raise ValueError(msg)
 
     # Find last Saturday (end of last complete week)
     # Saturday = weekday 5

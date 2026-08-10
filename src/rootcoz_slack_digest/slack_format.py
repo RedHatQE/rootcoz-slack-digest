@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from rootcoz_slack_digest.models import (
+    DEFAULT_BLOCK_COLUMNS,
     DEFAULT_COLUMNS,
     DigestColumn,
     JobRow,
@@ -45,6 +46,10 @@ def _column_value(row: JobRow, column: DigestColumn, *, mrkdwn: bool) -> str:
         return str(row.not_reviewed)
     if column is DigestColumn.BUILD:
         return str(row.build_number) if row.build_number is not None else "-"
+    if column is DigestColumn.BUNDLE:
+        return row.bundle or "-"
+    if column is DigestColumn.VERSION:
+        return row.version or "-"
     if column is DigestColumn.JENKINS:
         if not row.jenkins_url:
             return "-"
@@ -64,8 +69,16 @@ _COLUMN_HEADERS: dict[DigestColumn, str] = {
     DigestColumn.REVIEWED: "Rev",
     DigestColumn.NOT_REVIEWED: "Open",
     DigestColumn.BUILD: "Build",
+    DigestColumn.BUNDLE: "Bundle",
+    DigestColumn.VERSION: "Version",
     DigestColumn.JENKINS: "Jenkins",
     DigestColumn.ROOTCOZ: "rootcoz",
+}
+
+_RIGHT_ALIGNED_COLUMNS = {
+    DigestColumn.FAILURES,
+    DigestColumn.REVIEWED,
+    DigestColumn.NOT_REVIEWED,
 }
 
 
@@ -94,6 +107,27 @@ def _row_template_vars(row: JobRow) -> dict[str, str]:
     }
 
 
+def _sort_tier_rows(rows: list[JobRow], sort_by: SortBy) -> list[JobRow]:
+    """Sort rows within a tier: version/bundle desc, then ``sort_by``."""
+    if sort_by is SortBy.JOB_NAME:
+        return sorted(
+            rows,
+            key=lambda r: (
+                version_sort_key(r.version),
+                version_sort_key(r.bundle.lstrip("v")),
+                r.job_name.lower(),
+            ),
+        )
+
+    def _sort_key(r: JobRow) -> tuple:
+        base = (version_sort_key(r.version), version_sort_key(r.bundle.lstrip("v")))
+        if sort_by is SortBy.FAILURES:
+            return (*base, r.failure_count)
+        return (*base, r.not_reviewed)
+
+    return sorted(rows, key=_sort_key, reverse=True)
+
+
 def format_rows_text(
     rows: list[JobRow],
     columns: list[DigestColumn],
@@ -101,17 +135,14 @@ def format_rows_text(
     *,
     mrkdwn: bool,
     tiers: list[str] | None = None,
+    sort_by: SortBy = SortBy.NOT_REVIEWED,
 ) -> str:
     """Render job rows grouped by tier with inline links (mrkdwn) or as a table."""
     if not rows:
-        return (
-            "_No completed jobs with failures in this window._"
-            if mrkdwn
-            else "No completed jobs with failures in this window."
-        )
+        return message.empty_template if mrkdwn else message.empty_template_plain
 
     if mrkdwn:
-        return _format_grouped_by_tier(rows, tiers)
+        return _format_grouped_by_tier(rows, tiers, sort_by=sort_by)
 
     # Plain/non-mrkdwn: keep the column table
     if message.table_code_fence and columns:
@@ -121,11 +152,16 @@ def format_rows_text(
     return "\n".join(lines)
 
 
-def _format_grouped_by_tier(rows: list[JobRow], tiers: list[str] | None = None) -> str:
+def _format_grouped_by_tier(
+    rows: list[JobRow],
+    tiers: list[str] | None = None,
+    *,
+    sort_by: SortBy = SortBy.NOT_REVIEWED,
+) -> str:
     """Format rows grouped by tier with inline mrkdwn links.
 
     Order follows ``tiers`` config when provided; unknown tiers sort after, alphabetically.
-    Within each tier, sorted by bundle descending, then failure_count descending.
+    Within each tier, sorted by version/bundle then ``sort_by``.
     """
     groups: dict[str, list[JobRow]] = {}
     for row in rows:
@@ -139,15 +175,7 @@ def _format_grouped_by_tier(rows: list[JobRow], tiers: list[str] | None = None) 
 
     sections: list[str] = []
     for tier in sorted_tiers:
-        tier_rows = sorted(
-            groups[tier],
-            key=lambda r: (
-                version_sort_key(r.version),
-                version_sort_key(r.bundle.lstrip("v")),
-                r.failure_count,
-            ),
-            reverse=True,
-        )
+        tier_rows = _sort_tier_rows(groups[tier], sort_by)
         lines = [f"*{tier}*"] if len(sorted_tiers) > 1 else []
         for row in tier_rows:
             if row.jenkins_url:
@@ -180,15 +208,66 @@ def _link_cell(url: str, text: str) -> dict[str, object]:
     }
 
 
+def _column_setting(column: DigestColumn) -> dict[str, object]:
+    if column is DigestColumn.JOB_NAME:
+        return {"is_wrapped": True}
+    if column in _RIGHT_ALIGNED_COLUMNS:
+        return {"align": "right"}
+    return {}
+
+
+def _header_cell(
+    column: DigestColumn,
+    *,
+    total_jobs: int,
+    total_reviewed: int,
+    total_failures: int,
+) -> dict[str, object]:
+    if column is DigestColumn.JOB_NAME:
+        text = f"Jobs ({total_jobs})"
+    elif column is DigestColumn.REVIEWED:
+        text = f"Reviewed ({total_reviewed}/{total_failures})"
+    elif column is DigestColumn.BUNDLE:
+        text = "Bundle"
+    else:
+        text = _COLUMN_HEADERS[column]
+    return {"type": "raw_text", "text": text}
+
+
+def _data_cell(row: JobRow, column: DigestColumn) -> dict[str, object]:
+    if column is DigestColumn.JOB_NAME:
+        if row.jenkins_url:
+            return _link_cell(row.jenkins_url, row.job_name)
+        return {"type": "raw_text", "text": row.job_name}
+    if column is DigestColumn.JENKINS:
+        if row.jenkins_url:
+            return _link_cell(row.jenkins_url, "Jenkins")
+        return {"type": "raw_text", "text": "-"}
+    if column is DigestColumn.ROOTCOZ:
+        if row.rootcoz_url:
+            return _link_cell(row.rootcoz_url, "view")
+        return {"type": "raw_text", "text": "-"}
+    if column is DigestColumn.REVIEWED:
+        return {
+            "type": "raw_text",
+            "text": f"{row.reviewed_count}/{row.failure_count}",
+        }
+    text = _column_value(row, column, mrkdwn=False) or "-"
+    return {"type": "raw_text", "text": text}
+
+
 def _build_table_blocks(
     rows: list[JobRow],
     tiers: list[str] | None = None,
+    columns: list[DigestColumn] | None = None,
     *,
+    sort_by: SortBy = SortBy.NOT_REVIEWED,
     total_jobs: int = 0,
     total_reviewed: int = 0,
     total_failures: int = 0,
 ) -> list[dict[str, object]]:
     """Build Slack table blocks grouped by tier with links."""
+    cols = list(columns) if columns is not None else list(DEFAULT_BLOCK_COLUMNS)
     groups: dict[str, list[JobRow]] = {}
     for row in rows:
         groups.setdefault(row.tier, []).append(row)
@@ -203,15 +282,7 @@ def _build_table_blocks(
     show_tier_header = len(sorted_tiers) > 1
 
     for tier in sorted_tiers:
-        tier_rows = sorted(
-            groups[tier],
-            key=lambda r: (
-                version_sort_key(r.version),
-                version_sort_key(r.bundle.lstrip("v")),
-                r.failure_count,
-            ),
-            reverse=True,
-        )
+        tier_rows = _sort_tier_rows(groups[tier], sort_by)
 
         if show_tier_header:
             blocks.append(
@@ -221,43 +292,20 @@ def _build_table_blocks(
                 }
             )
 
-        header_row: list[dict[str, object]] = [
-            {"type": "raw_text", "text": f"Jobs ({total_jobs})"},
-            {"type": "raw_text", "text": "Bundle"},
-            {"type": "raw_text", "text": f"Reviewed ({total_reviewed}/{total_failures})"},
-            {"type": "raw_text", "text": "rootcoz"},
+        header_row = [
+            _header_cell(
+                col,
+                total_jobs=total_jobs,
+                total_reviewed=total_reviewed,
+                total_failures=total_failures,
+            )
+            for col in cols
         ]
-
-        data_rows: list[list[dict[str, object]]] = []
-        for row in tier_rows:
-            if row.jenkins_url:
-                job_cell: dict[str, object] = _link_cell(row.jenkins_url, row.job_name)
-            else:
-                job_cell = {"type": "raw_text", "text": row.job_name}
-
-            bundle_cell: dict[str, object] = {
-                "type": "raw_text",
-                "text": row.bundle or "-",
-            }
-            reviewed_cell: dict[str, object] = {
-                "type": "raw_text",
-                "text": f"{row.reviewed_count}/{row.failure_count}",
-            }
-            if row.rootcoz_url:
-                rootcoz_cell: dict[str, object] = _link_cell(row.rootcoz_url, "view")
-            else:
-                rootcoz_cell = {"type": "raw_text", "text": "-"}
-
-            data_rows.append([job_cell, bundle_cell, reviewed_cell, rootcoz_cell])
+        data_rows = [[_data_cell(row, col) for col in cols] for row in tier_rows]
 
         table_block: dict[str, object] = {
             "type": "table",
-            "column_settings": [
-                {"is_wrapped": True},  # Job — wrap long names
-                {},  # Bundle
-                {"align": "right"},  # Reviewed — right-aligned
-                {},  # rootcoz
-            ],
+            "column_settings": [_column_setting(col) for col in cols],
             "rows": [header_row] + data_rows,
         }
         blocks.append(table_block)
@@ -370,9 +418,16 @@ def build_message(
         omitted_text = _safe_format(message.omitted_template, "omitted", omitted=omitted)
 
     if message.format is MessageFormat.BLOCKS:
+        # DigestConfig still defaults to DEFAULT_COLUMNS (plain-era list). When
+        # callers have not customized columns, keep the classic blocks layout.
+        block_columns = (
+            list(DEFAULT_BLOCK_COLUMNS) if columns == list(DEFAULT_COLUMNS) else columns
+        )
         table_blocks = _build_table_blocks(
             shown,
             tiers,
+            block_columns,
+            sort_by=sort_by,
             total_jobs=total_jobs,
             total_reviewed=total_reviewed,
             total_failures=total_failures,
@@ -394,7 +449,9 @@ def build_message(
         return blocks
 
     mrkdwn = message.format is not MessageFormat.PLAIN
-    body = format_rows_text(shown, columns, message, mrkdwn=mrkdwn, tiers=tiers)
+    body = format_rows_text(
+        shown, columns, message, mrkdwn=mrkdwn, tiers=tiers, sort_by=sort_by
+    )
     parts = [header, totals, body]
     if omitted_text:
         parts.append(omitted_text)

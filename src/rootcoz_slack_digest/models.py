@@ -31,6 +31,8 @@ class DigestColumn(StrEnum):
     JENKINS = "jenkins"
     ROOTCOZ = "rootcoz"
     BUILD = "build"
+    BUNDLE = "bundle"
+    VERSION = "version"
 
 
 class MessageFormat(StrEnum):
@@ -47,6 +49,14 @@ DEFAULT_COLUMNS: list[DigestColumn] = [
     DigestColumn.FAILURES,
     DigestColumn.REVIEWED,
     DigestColumn.JENKINS,
+    DigestColumn.ROOTCOZ,
+]
+
+# Default Block Kit table layout (Job / Bundle / Reviewed / rootcoz).
+DEFAULT_BLOCK_COLUMNS: list[DigestColumn] = [
+    DigestColumn.JOB_NAME,
+    DigestColumn.BUNDLE,
+    DigestColumn.REVIEWED,
     DigestColumn.ROOTCOZ,
 ]
 
@@ -96,6 +106,8 @@ class ScheduleConfig(BaseModel):
 
     cron: str = "0 7 * * 0"
     timezone: str = "UTC"
+    # sunday → last complete Sun–Sat; monday → last complete Mon–Sun.
+    week_start: str = "sunday"
 
 
 class DigestConfig(BaseModel):
@@ -150,7 +162,19 @@ class MessageConfig(BaseModel):
         "🎉 *rootcoz {lanes} weekly digest* — {week_label}{excluded_versions}{mention_suffix}\n\n"
         "✅ Zero {lanes} failures for *{team}* this week! 🚀"
     )
+    celebration_max_links: int = 20
+    celebration_more_template: str = "_+{remaining} more reviewed jobs_"
+    empty_template: str = "_No completed jobs with failures in this window._"
+    empty_template_plain: str = "No completed jobs with failures in this window."
     email_subject_template: str = "rootcoz {lanes} weekly digest — {week_label} — {team}"
+    email_body_title: str = "rootcoz weekly digest"
+    email_celebration_reviewed_template: str = (
+        "All <strong>{total_jobs}</strong> {lanes} failures for "
+        "<strong>{team}</strong> have been reviewed! 👏"
+    )
+    email_celebration_no_failures_template: str = (
+        "Zero {lanes} failures for <strong>{team}</strong> this week! 🚀"
+    )
 
 
 class FieldMapConfig(BaseModel):
@@ -215,6 +239,7 @@ class RootcozConfig(BaseModel):
     url: str = ""
     api_key: str = ""
     verify_ssl: bool = True
+    timeout: int = 60
     endpoint: str = "/api/dashboard/filtered"
     params: dict[str, str] = Field(
         default_factory=lambda: {
@@ -234,6 +259,8 @@ class SlackConfig(BaseModel):
     mode: Literal["webhook", "bot"] = "bot"
     webhook_url: str = ""
     bot_token: str = ""
+    api_base_url: str = "https://slack.com/api"
+    timeout: int = 30
 
 
 class SlackTargetConfig(BaseModel):
@@ -280,7 +307,10 @@ class EmailConfig(BaseModel):
     smtp_host: str = "smtp.example.com"
     smtp_port: int = 25
     from_address: str = "digest@example.com"
-    use_tls: bool = False
+    use_tls: bool = True
+    smtp_username: str = ""
+    smtp_password: str = ""
+    timeout: int = 30
 
 
 class AppConfig(BaseModel):

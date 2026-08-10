@@ -5,24 +5,23 @@
 [schedule]
 # Keep deploy/cronjob.yaml spec.schedule in sync with this value.
 # Note: schedule.cron is a sync marker for deploy/cronjob.yaml; timezone is unused.
-# Week window is always the last complete Sun–Sat in UTC.
+# week_start: sunday → last complete Sun–Sat; monday → last complete Mon–Sun.
 cron = "0 10 * * 0"
 timezone = "Asia/Jerusalem"
+week_start = "sunday"
 
 [digest]
 # 0 = no limit (show all jobs). Positive N truncates the Slack message.
 max_rows = 0
 # sort_by applies within each tier group. Rows are first grouped by tier
 # (order from `tiers`), then sorted by version descending, bundle descending,
-# and finally by this field.
+# and finally by this field (job_name sorts ascending and does not reverse).
 sort_by = "not_reviewed" # not_reviewed | failures | job_name
 # API labels to include. "other" is a display catch-all (not sent to API).
 tiers = ["gating", "release-checklist", "other"]
-# Column order controls the Slack table (API fields only).
-# Note: columns apply to plain/mrkdwn format only. Blocks format uses a fixed
-# table layout (Job, Bundle, Reviewed, rootcoz).
-columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
-# Optional columns: team, not_reviewed, build
+# Column order controls Slack tables (blocks + plain). Default blocks layout:
+columns = ["job_name", "bundle", "reviewed", "rootcoz"]
+# Optional columns: tier, team, failures, not_reviewed, build, jenkins, version
 # Passed as API ``exclude_label`` query params (metadata labels).
 # Example: exclude_labels = ["s390x"]
 exclude_labels = []
@@ -52,14 +51,19 @@ table_code_fence = true
 # {week_label}, {excluded_versions}, {mention_suffix}, {mention}, {team}, {total_jobs}, {lanes}
 # celebration_reviewed_template = "🎉 *rootcoz {lanes} weekly digest* — {week_label}{excluded_versions}{mention_suffix}\n\n✅ All *{total_jobs}* {lanes} failures for *{team}* have been reviewed! 👏"
 # celebration_no_failures_template = "🎉 *rootcoz {lanes} weekly digest* — {week_label}{excluded_versions}{mention_suffix}\n\n✅ Zero {lanes} failures for *{team}* this week! 🚀"
+# celebration_max_links = 20
+# celebration_more_template = "_+{remaining} more reviewed jobs_"
+# empty_template / empty_template_plain for zero-row digests
 # Email subject. Placeholders: {lanes}, {week_label}, {team}
 # email_subject_template = "rootcoz {lanes} weekly digest — {week_label} — {team}"
+# email_body_title / email_celebration_*_template for HTML email bodies
 
 [rootcoz]
 # Prefer env: ROOTCOZ_URL, ROOTCOZ_API_KEY, ROOTCOZ_VERIFY_SSL
 url = ""
 api_key = ""
 verify_ssl = true
+timeout = 60
 # API endpoint and default query params
 endpoint = "/api/dashboard/filtered"
 
@@ -103,11 +107,16 @@ release-checklist = "release-checklist"
 mode = "bot"
 bot_token = ""
 webhook_url = ""
+api_base_url = "https://slack.com/api"
+timeout = 30
 
 [email]
-# SMTP relay (no auth). Enable to deliver digests via TARGETS[].email.
+# SMTP relay. Optional smtp_username/smtp_password for authenticated relays.
 enabled = false
 smtp_host = "smtp.example.com"
 smtp_port = 25
 from_address = "digest@example.com"
-use_tls = false
+use_tls = true
+# smtp_username = ""
+# smtp_password = ""
+timeout = 30
