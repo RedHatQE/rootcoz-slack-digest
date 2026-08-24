@@ -92,6 +92,8 @@ class JobRow(BaseModel):
     created_at: str = ""
     version: str = ""
     bundle: str = ""
+    # Jenkins miss-check: show rootcoz column as ``missing`` (same digest table).
+    rootcoz_missing: bool = False
 
     @property
     def not_reviewed(self) -> int:
@@ -117,8 +119,10 @@ class DigestConfig(BaseModel):
 
     max_rows: int = Field(default=0, ge=0)  # 0 = no limit
     sort_by: SortBy = SortBy.NOT_REVIEWED
-    # Passed as API ``label`` query params (server-side tier filter).
-    tiers: list[str] = Field(default_factory=lambda: ["gating", "release-checklist", "other"])
+    # Passed as API ``label`` query params (OR'd — one request per label).
+    # Rootcoz ANDs multiple labels in a single request, which would return 0 rows
+    # for typical multi-tier lists. Default Slack digest is gating only.
+    tiers: list[str] = Field(default_factory=lambda: ["gating"])
     columns: list[DigestColumn] = Field(default_factory=lambda: list(DEFAULT_COLUMNS))
     # Passed as API ``exclude_label`` query params (metadata labels).
     exclude_labels: list[str] = Field(default_factory=list)
@@ -313,6 +317,51 @@ class EmailConfig(BaseModel):
     timeout: int = 30
 
 
+class JenkinsMissCheckConfig(BaseModel):
+    """Pre-send Jenkins reconciliation / rootcoz-down fallback for Slack."""
+
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = False
+    # Digest tiers / lanes to reconcile (v1 default: gating only).
+    scopes: list[str] = Field(default_factory=lambda: ["gating"])
+    # Path under Jenkins base URL (use REPLACE_ in committed examples).
+    view_path: str = "/view/REPLACE_VIEW/"
+    # Only these Jenkins build results (non-success). Empty = any non-SUCCESS.
+    build_results: list[str] = Field(default_factory=lambda: ["FAILURE", "UNSTABLE"])
+    # JOB_METADATA.labels must include all of these (e.g. gate).
+    require_labels: list[str] = Field(default_factory=lambda: ["gate"])
+    # Job name must contain this substring (case-insensitive), e.g. "gating".
+    require_name_substring: str = "gating"
+    attach_to_slack: bool = True
+    fallback_when_rootcoz_down: bool = True
+    max_miss_rows: int = Field(default=30, ge=1)
+    # Jenkins string parameter holding JSON job metadata (includes ``team``).
+    job_metadata_param: str = "JOB_METADATA"
+    # Build parameter for CNV bundle version string.
+    bundle_param: str = "DATA_BUNDLE_VERSION"
+    # Regex for rootcoz result URLs in descriptions / build text.
+    rootcoz_link_regex: str = r"https?://[^\s\"'<>]+/results/[^\s\"'<>]+"
+    # When non-empty, only these netlocs are accepted for extracted rootcoz links.
+    # apply_env_overrides fills this from ROOTCOZ_URL when empty.
+    allowed_rootcoz_hosts: list[str] = Field(default_factory=list)
+
+
+class JenkinsConfig(BaseModel):
+    """Jenkins connection + miss-check settings (credentials via env)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    url: str = ""
+    user: str = ""
+    token: str = ""
+    verify_ssl: bool = True
+    timeout: int = 60
+    miss_check: JenkinsMissCheckConfig = Field(default_factory=JenkinsMissCheckConfig)
+    # Jenkins JOB_METADATA.team display name → rootcoz / TARGETS team slug.
+    team_map: dict[str, str] = Field(default_factory=dict)
+
+
 class AppConfig(BaseModel):
     """Full application config loaded from TOML + env overlays."""
 
@@ -324,6 +373,7 @@ class AppConfig(BaseModel):
     rootcoz: RootcozConfig = Field(default_factory=RootcozConfig)
     slack: SlackConfig = Field(default_factory=SlackConfig)
     email: EmailConfig = Field(default_factory=EmailConfig)
+    jenkins: JenkinsConfig = Field(default_factory=JenkinsConfig)
 
 
 def load_config(path: Path | None) -> AppConfig:

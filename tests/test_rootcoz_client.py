@@ -11,25 +11,27 @@ from rootcoz_slack_digest.week import week_from_dates
 
 
 def test_fetch_job_rows_sends_server_side_filters() -> None:
-    captured: dict[str, Any] = {}
+    captured: list[httpx.URL] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        captured["url"] = str(request.url)
+        captured.append(request.url)
+        label = request.url.params.get("label")
+        job_id = "g1" if label == "gating" else "r1"
         return httpx.Response(
             200,
             json=[
                 {
-                    "job_id": "j1",
-                    "job_name": "tier2-network",
+                    "job_id": job_id,
+                    "job_name": f"job-{label}",
                     "metadata": {
                         "team": "network",
                         "version": "4.22",
-                        "labels": ["gating"],
+                        "labels": [label],
                     },
                     "failure_count": 2,
                     "reviewed_count": 0,
                     "build_number": 9,
-                    "jenkins_url": "https://jenkins.example/job/tier2-network/9/",
+                    "jenkins_url": f"https://jenkins.example/job/job-{label}/9/",
                     "created_at": "2026-08-01T00:00:00Z",
                     "tags": ["cnv", "v4.22.6.rhel9-9", "other"],
                 }
@@ -49,17 +51,53 @@ def test_fetch_job_rows_sends_server_side_filters() -> None:
             exclude_labels=["s390x"],
         )
 
+    # Multiple labels are OR'd via one request per label (server ANDs multiples).
+    assert len(captured) == 2
+    assert len(rows) == 2
+    assert {r.job_id for r in rows} == {"g1", "r1"}
+    assert rows[0].bundle == "v4.22.6.rhel9-9" or rows[1].bundle == "v4.22.6.rhel9-9"
+    labels_seen = sorted(u.params.get("label") for u in captured)
+    assert labels_seen == ["gating", "release-checklist"]
+    for url in captured:
+        params = url.params
+        assert params.get("team") == "network"
+        assert params.get("date_from") == "2026-07-26"
+        assert params.get("date_to") == "2026-08-01"
+        assert params.get_list("exclude_label") == ["s390x"]
+        assert params.get("review_status") == "not_reviewed"
+        assert len(params.get_list("label")) == 1
+
+
+def test_fetch_job_rows_ors_labels_and_dedupes() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        # Same job returned under both labels → one merged row.
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "job_id": "shared",
+                    "job_name": "shared-job",
+                    "metadata": {"team": "network", "version": "4.22", "labels": ["gating"]},
+                    "failure_count": 1,
+                    "reviewed_count": 0,
+                    "build_number": 3,
+                }
+            ],
+        )
+
+    transport = httpx.MockTransport(handler)
+    http = httpx.Client(transport=transport, base_url="https://rootcoz.example")
+    cfg = RootcozConfig(url="https://rootcoz.example", api_key="test-key")
+    window: WeekWindow = week_from_dates(date(2026, 7, 26), date(2026, 8, 1))
+
+    with RootcozClient(cfg, client=http) as client:
+        rows = client.fetch_job_rows(
+            window,
+            labels=["gating", "release-checklist"],
+        )
+
     assert len(rows) == 1
-    assert rows[0].team == "network"
-    assert rows[0].version == "4.22"
-    assert rows[0].bundle == "v4.22.6.rhel9-9"
-    params = httpx.URL(captured["url"]).params
-    assert params.get("team") == "network"
-    assert params.get("date_from") == "2026-07-26"
-    assert params.get("date_to") == "2026-08-01"
-    assert params.get_list("label") == ["gating", "release-checklist"]
-    assert params.get_list("exclude_label") == ["s390x"]
-    assert params.get("review_status") == "not_reviewed"
+    assert rows[0].job_id == "shared"
 
 
 def test_fetch_all_jobs_omits_review_status() -> None:
