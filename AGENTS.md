@@ -4,7 +4,8 @@
 
 REPLACE_ORG tool: weekly Slack (and optional email) digest of rootcoz failures/reviews
 for CNV QE. Always query the **rootcoz API** (`GET /api/dashboard/filtered` with
-Bearer auth) before posting. Never depend on HTML summary URLs.
+Bearer auth) before posting when available. Never depend on HTML summary URLs.
+Optional Jenkins miss-check / rootcoz-down fallback for Slack (`[jenkins]`).
 Default week window is the last complete Sun–Sat (UTC).
 
 ## Layout
@@ -22,8 +23,9 @@ Default week window is the last complete Sun–Sat (UTC).
 - Builtin types only (`list`, `dict` — not `List`/`Dict`)
 - Frozen Pydantic models for config and rows
 - No mocks/stubs in `src/` — doubles stay in `tests/`
-- Secrets via env / K8s Secret only — never commit tokens
+- Secrets via env / K8s Secret only — never commit tokens or real internal hosts
 - Team routing via `TARGETS` JSON env (team → optional slack/email); do not hardcode people
+- Jenkins display teams → TARGETS slugs via `[jenkins.team_map]` (REPLACE_* in examples)
 - Rootcoz field paths and display tiers are configurable (`[rootcoz.field_map]`,
   `[rootcoz.tier_labels]`, `bundle_pattern`, `default_tier`)
 

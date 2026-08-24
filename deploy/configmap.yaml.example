@@ -8,7 +8,7 @@ metadata:
 data:
   config.toml: |
     [schedule]
-    # Week window is always the last complete Sun–Sat in UTC.
+    # Default week window: last complete Sun–Sat in UTC (week_start = "monday" → Mon–Sun).
     cron = "0 10 * * 0"
     timezone = "UTC"
     week_start = "sunday"
@@ -18,7 +18,7 @@ data:
     max_rows = 0
     sort_by = "not_reviewed"
     # API labels to include. "other" is a display catch-all (not sent to API).
-    tiers = ["gating", "release-checklist", "other"]
+    tiers = ["gating"]
     columns = ["job_name", "bundle", "reviewed", "rootcoz"]
     exclude_labels = ["REPLACE"]
     exclude_job_patterns = ["REPLACE"]
@@ -70,8 +70,30 @@ data:
     smtp_port = 25
     from_address = "digest@example.com"
     use_tls = true
+
+    # Jenkins miss-check: enable in-cluster after staging validates.
+    [jenkins]
+    verify_ssl = true
+    timeout = 60
+
+    [jenkins.miss_check]
+    enabled = false
+    scopes = ["gating"]
+    view_path = "/view/REPLACE_VIEW/"
+    build_results = ["FAILURE", "UNSTABLE"]
+    require_labels = ["gate"]
+    require_name_substring = "gating"
+    attach_to_slack = true
+    fallback_when_rootcoz_down = true
+    bundle_param = "DATA_BUNDLE_VERSION"
+
+    [jenkins.team_map]
+    "REPLACE_DISPLAY_TEAM" = "REPLACE_TEAM"
+    "REPLACE_DISPLAY_TEAM_2" = "REPLACE_TEAM_2"
   ROOTCOZ_URL: "REPLACE"
   ROOTCOZ_VERIFY_SSL: "true"
+  JENKINS_URL: "REPLACE"
+  JENKINS_VERIFY_SSL: "true"
   TARGETS: |
     [
       {

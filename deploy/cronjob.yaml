@@ -46,6 +46,18 @@ spec:
                     configMapKeyRef:
                       name: rootcoz-slack-digest-config
                       key: ROOTCOZ_VERIFY_SSL
+                - name: JENKINS_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: rootcoz-slack-digest-config
+                      key: JENKINS_URL
+                      optional: true
+                - name: JENKINS_VERIFY_SSL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: rootcoz-slack-digest-config
+                      key: JENKINS_VERIFY_SSL
+                      optional: true
                 - name: TARGETS
                   valueFrom:
                     configMapKeyRef:

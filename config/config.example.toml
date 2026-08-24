@@ -17,8 +17,10 @@ max_rows = 0
 # (order from `tiers`), then sorted by version descending, bundle descending,
 # and finally by this field (job_name sorts ascending and does not reverse).
 sort_by = "not_reviewed" # not_reviewed | failures | job_name
-# API labels to include. "other" is a display catch-all (not sent to API).
-tiers = ["gating", "release-checklist", "other"]
+# API labels to include (OR — one request per label; server ANDs multiples).
+# Slack digest default: gating only. Add labels here only if you want them in the digest.
+# "other" is a display catch-all (not sent to API) if you include it.
+tiers = ["gating"]
 # Column order controls Slack tables (blocks + plain). Default blocks layout:
 columns = ["job_name", "bundle", "reviewed", "rootcoz"]
 # Optional columns: tier, team, failures, not_reviewed, build, jenkins, version
@@ -120,3 +122,36 @@ use_tls = true
 # smtp_username = ""
 # smtp_password = ""
 timeout = 30
+
+# Optional Jenkins miss-check / rootcoz-down fallback (Slack only).
+# Prefer env: JENKINS_URL, JENKINS_USER, JENKINS_TOKEN, JENKINS_VERIFY_SSL
+# Do not commit real hosts, users, or tokens.
+[jenkins]
+url = ""
+user = ""
+token = ""
+verify_ssl = true
+timeout = 60
+
+[jenkins.miss_check]
+# Off by default until staging validates view path + credentials.
+enabled = false
+scopes = ["gating"]
+view_path = "/view/REPLACE_VIEW/"
+# Finished non-success only (never SUCCESS). Empty list = any non-SUCCESS.
+build_results = ["FAILURE", "UNSTABLE"]
+# JOB_METADATA.labels must include all of these.
+require_labels = ["gate"]
+# Job name must contain this substring (drops non-gating view members like test-ssp-cnv-4.18).
+require_name_substring = "gating"
+attach_to_slack = true
+fallback_when_rootcoz_down = true
+max_miss_rows = 30
+job_metadata_param = "JOB_METADATA"
+bundle_param = "DATA_BUNDLE_VERSION"
+# rootcoz_link_regex = "https?://[^\\s\"'<>]+/results/[^\\s\"'<>]+"
+
+# Map Jenkins JOB_METADATA.team display names → rootcoz / TARGETS team slugs.
+[jenkins.team_map]
+"REPLACE_DISPLAY_TEAM" = "REPLACE_TEAM"
+"REPLACE_DISPLAY_TEAM_2" = "REPLACE_TEAM_2"

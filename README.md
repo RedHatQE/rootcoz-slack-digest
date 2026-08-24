@@ -3,13 +3,20 @@
 Slack (and optional email) digest of [rootcoz](https://github.com/myk-org/rootcoz)
 failures and review progress for CNV QE teams.
 
-**Data source:** rootcoz HTTP API only (`GET /api/dashboard/filtered` with Bearer
+**Data source:** rootcoz HTTP API (`GET /api/dashboard/filtered` with Bearer
 auth). This tool does **not** use or link to HTML coverage/rootcause summary pages.
-Jenkins and rootcoz result URLs come from the API response (no `JENKINS_URL` env).
+Jenkins and rootcoz result URLs usually come from the API response.
+
+**Optional Slack miss-check:** when `[jenkins.miss_check] enabled = true`, failed
+builds from a Jenkins view are reconciled before post (per-team via
+`JOB_METADATA.team` → `[jenkins.team_map]`). If rootcoz is down, Slack falls back
+to Jenkins-only rows. Credentials: `JENKINS_USER` / `JENKINS_TOKEN` (Secret);
+`JENKINS_URL` / `JENKINS_VERIFY_SSL` in ConfigMap. Examples use `REPLACE_*` only.
 
 On a configurable schedule (or on demand via CLI), it queries rootcoz for a date
-window (default: last complete Sun–Sat), formats a configurable table (job, tier,
-failures, reviewed, Jenkins + rootcoz links), and posts to Slack and/or email.
+window (default: last complete Sun–Sat UTC; `[schedule].week_start` can be
+`monday`), formats a configurable table (defaults: job, bundle, reviewed,
+rootcoz links), and posts to Slack and/or email.
 Teams are CC'd via **Slack usergroups** they manage themselves.
 
 ## Quick start
@@ -38,18 +45,18 @@ uv run rootcoz-slack-digest run --config config/config.toml --dry-run
 
 ## Configuration highlights
 
-TOML sections: `schedule`, `digest`, `message`, `slack`, `rootcoz`, `email`.
+TOML sections: `schedule`, `digest`, `message`, `slack`, `rootcoz`, `email`, `jenkins`.
 
 ```toml
 [schedule]
 # Sync marker only — OpenShift CronJob spec.schedule is what triggers runs.
-# Week window is always Sun–Sat UTC (timezone setting is unused).
-cron = "0 7 * * 0"
+# Default week window is last complete Sun–Sat UTC; set week_start = "monday" for Mon–Sun.
+cron = "0 10 * * 0"
 
 [digest]
-columns = ["job_name", "tier", "failures", "reviewed", "jenkins", "rootcoz"]
+columns = ["job_name", "bundle", "reviewed", "rootcoz"]
 # Also: exclude_labels, exclude_job_patterns, exclude_versions, include_tags,
-# sort_by, max_rows, tiers
+# sort_by, max_rows, tiers (default: ["gating"])
 
 [message]
 format = "blocks"           # blocks | mrkdwn | plain
@@ -99,8 +106,8 @@ The CronJob installs the package from the **public** GitHub repo via
 
 | Source | Keys |
 |--------|------|
-| **ConfigMap** | `ROOTCOZ_URL`, `ROOTCOZ_VERIFY_SSL`, `TARGETS` (JSON array, **mandatory** for posting) |
-| **Secret** | `ROOTCOZ_API_KEY`, `SLACK_BOT_TOKEN` |
+| **ConfigMap** | `ROOTCOZ_URL`, `ROOTCOZ_VERIFY_SSL`, `TARGETS` (JSON array, **mandatory** for posting); optional `JENKINS_URL`, `JENKINS_VERIFY_SSL` |
+| **Secret** | `ROOTCOZ_API_KEY`, `SLACK_BOT_TOKEN`; optional `JENKINS_USER`, `JENKINS_TOKEN` |
 
 `TARGETS` format:
 
@@ -122,13 +129,15 @@ The CronJob installs the package from the **public** GitHub repo via
 
 ### Staging
 
-Manifests under `deploy/staging/` post to a test Slack channel only
-(`suspend: true` — trigger manually). Reuses the production Secret for
-credentials; apply ConfigMap + CronJob separately from prod.
+Staging uses the same `deploy/*.yaml.example` templates with a test Slack channel
+in `TARGETS` (`suspend: true` — trigger manually). Do not commit live staging
+manifests; keep filled copies local or in cluster only. Reuse the production
+Secret for credentials; apply ConfigMap + CronJob separately from prod.
 
 ```bash
-oc apply -f deploy/staging/configmap.yaml -f deploy/staging/cronjob.yaml -n REPLACE_NAMESPACE
-oc create job --from=cronjob/rootcoz-slack-digest-staging staging-$(date +%s) -n REPLACE_NAMESPACE
+# Fill examples locally (not committed), then:
+oc apply -f deploy/configmap.yaml -f deploy/cronjob.yaml -n REPLACE_NAMESPACE
+oc create job --from=cronjob/rootcoz-slack-digest staging-$(date +%s) -n REPLACE_NAMESPACE
 ```
 
 ## Development

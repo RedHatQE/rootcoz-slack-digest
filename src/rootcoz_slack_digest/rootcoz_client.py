@@ -178,6 +178,94 @@ class RootcozClient:
             )
         return rows
 
+    def _fetch_filtered_rows(
+        self,
+        window: WeekWindow,
+        *,
+        team: str = "",
+        labels: list[str] | None = None,
+        exclude_labels: list[str] | None = None,
+        exclude_versions: list[str] | None = None,
+        include_tags: list[str] | None = None,
+        include_review_status: bool,
+    ) -> list[JobRow]:
+        """One API request; ``labels`` sent as repeated ``label`` params (AND on server)."""
+        params = self._query_params(
+            window,
+            team=team,
+            labels=labels,
+            exclude_labels=exclude_labels,
+            include_review_status=include_review_status,
+        )
+        resp = self._client.get(self._config.endpoint, params=params)
+        resp.raise_for_status()
+        return self._parse_job_rows(
+            resp.json(),
+            exclude_versions=exclude_versions,
+            include_tags=include_tags,
+        )
+
+    def _fetch_rows_for_labels(
+        self,
+        window: WeekWindow,
+        *,
+        team: str = "",
+        labels: list[str] | None = None,
+        exclude_labels: list[str] | None = None,
+        exclude_versions: list[str] | None = None,
+        include_tags: list[str] | None = None,
+        include_review_status: bool,
+    ) -> list[JobRow]:
+        """Fetch jobs for labels with OR semantics.
+
+        Rootcoz treats multiple ``label`` query params as AND (job must have every
+        label). Digest tiers are meant as a union, so we query each label separately
+        and merge by ``(job_id, build_number)``.
+        """
+        if not labels:
+            rows = self._fetch_filtered_rows(
+                window,
+                team=team,
+                labels=None,
+                exclude_labels=exclude_labels,
+                exclude_versions=exclude_versions,
+                include_tags=include_tags,
+                include_review_status=include_review_status,
+            )
+        elif len(labels) == 1:
+            rows = self._fetch_filtered_rows(
+                window,
+                team=team,
+                labels=labels,
+                exclude_labels=exclude_labels,
+                exclude_versions=exclude_versions,
+                include_tags=include_tags,
+                include_review_status=include_review_status,
+            )
+        else:
+            merged: dict[tuple[str, int | None], JobRow] = {}
+            for label in labels:
+                for row in self._fetch_filtered_rows(
+                    window,
+                    team=team,
+                    labels=[label],
+                    exclude_labels=exclude_labels,
+                    exclude_versions=exclude_versions,
+                    include_tags=include_tags,
+                    include_review_status=include_review_status,
+                ):
+                    merged[(row.job_id, row.build_number)] = row
+            rows = list(merged.values())
+        logger.info(
+            "Fetched %d jobs from rootcoz (%s) team=%r labels=%s review_status=%s",
+            len(rows),
+            self._config.endpoint,
+            team,
+            labels,
+            include_review_status,
+        )
+        return rows
+
     def fetch_job_rows(
         self,
         window: WeekWindow,
@@ -188,29 +276,19 @@ class RootcozClient:
         exclude_versions: list[str] | None = None,
         include_tags: list[str] | None = None,
     ) -> list[JobRow]:
-        """Fetch jobs with server-side filtering via API query params."""
-        params = self._query_params(
+        """Fetch jobs with server-side filtering via API query params.
+
+        Multiple ``labels`` are OR'd (one request per label, then merged).
+        """
+        return self._fetch_rows_for_labels(
             window,
             team=team,
             labels=labels,
             exclude_labels=exclude_labels,
-            include_review_status=True,
-        )
-        resp = self._client.get(self._config.endpoint, params=params)
-        resp.raise_for_status()
-        rows = self._parse_job_rows(
-            resp.json(),
             exclude_versions=exclude_versions,
             include_tags=include_tags,
+            include_review_status=True,
         )
-        logger.info(
-            "Fetched %d jobs from rootcoz (%s) team=%r labels=%s",
-            len(rows),
-            self._config.endpoint,
-            team,
-            labels,
-        )
-        return rows
 
     def fetch_all_jobs(
         self,
@@ -222,26 +300,16 @@ class RootcozClient:
         exclude_versions: list[str] | None = None,
         include_tags: list[str] | None = None,
     ) -> list[JobRow]:
-        """Fetch all jobs (reviewed + unreviewed) for celebration context."""
-        params = self._query_params(
+        """Fetch all jobs (reviewed + unreviewed) for celebration / inventory.
+
+        Multiple ``labels`` are OR'd (one request per label, then merged).
+        """
+        return self._fetch_rows_for_labels(
             window,
             team=team,
             labels=labels,
             exclude_labels=exclude_labels,
-            include_review_status=False,
-        )
-        resp = self._client.get(self._config.endpoint, params=params)
-        resp.raise_for_status()
-        rows = self._parse_job_rows(
-            resp.json(),
             exclude_versions=exclude_versions,
             include_tags=include_tags,
+            include_review_status=False,
         )
-        logger.info(
-            "Fetched %d all-status jobs from rootcoz (%s) team=%r labels=%s",
-            len(rows),
-            self._config.endpoint,
-            team,
-            labels,
-        )
-        return rows

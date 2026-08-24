@@ -27,7 +27,11 @@ def sort_rows(rows: list[JobRow], sort_by: SortBy) -> list[JobRow]:
 def _link(label: str, url: str) -> str:
     if not url:
         return ""
-    return f"<{url}|{label}>"
+    if not url.startswith(("http://", "https://")):
+        return label.replace("|", "/").replace("<", "").replace(">", "")
+    safe_url = url.replace("|", "%7C").replace("<", "%3C").replace(">", "%3E")
+    safe_label = label.replace("|", "/").replace("<", "").replace(">", "")
+    return f"<{safe_url}|{safe_label}>"
 
 
 def _column_value(row: JobRow, column: DigestColumn, *, mrkdwn: bool) -> str:
@@ -55,6 +59,8 @@ def _column_value(row: JobRow, column: DigestColumn, *, mrkdwn: bool) -> str:
             return "-"
         return _link("Jenkins", row.jenkins_url) if mrkdwn else row.jenkins_url
     if column is DigestColumn.ROOTCOZ:
+        if row.rootcoz_missing:
+            return "missing"
         if not row.rootcoz_url:
             return "-"
         return _link("rootcoz", row.rootcoz_url) if mrkdwn else row.rootcoz_url
@@ -184,9 +190,12 @@ def _format_grouped_by_tier(
                 name_part = f"*{row.job_name}*"
 
             bundle_part = f" [{row.bundle}]" if row.bundle else ""
-            reviewed = f"{row.reviewed_count}/{row.failure_count} reviewed"
+            if row.rootcoz_missing:
+                reviewed = "missing from rootcoz"
+            else:
+                reviewed = f"{row.reviewed_count}/{row.failure_count} reviewed"
             parts = [f"• {name_part}{bundle_part} {reviewed}"]
-            if row.rootcoz_url:
+            if row.rootcoz_url and not row.rootcoz_missing:
                 parts.append(_link("rootcoz", row.rootcoz_url))
 
             lines.append(" · ".join(parts))
@@ -196,13 +205,16 @@ def _format_grouped_by_tier(
 
 
 def _link_cell(url: str, text: str) -> dict[str, object]:
-    """Build a rich_text table cell with a single link."""
+    """Build a rich_text table cell with a single link (http/https only)."""
+    if not url.startswith(("http://", "https://")):
+        return {"type": "raw_text", "text": text}
+    safe_text = text.replace("|", "/").replace("<", "").replace(">", "")
     return {
         "type": "rich_text",
         "elements": [
             {
                 "type": "rich_text_section",
-                "elements": [{"type": "link", "url": url, "text": text}],
+                "elements": [{"type": "link", "url": url, "text": safe_text}],
             }
         ],
     }
@@ -244,10 +256,14 @@ def _data_cell(row: JobRow, column: DigestColumn) -> dict[str, object]:
             return _link_cell(row.jenkins_url, "Jenkins")
         return {"type": "raw_text", "text": "-"}
     if column is DigestColumn.ROOTCOZ:
+        if row.rootcoz_missing:
+            return {"type": "raw_text", "text": "missing"}
         if row.rootcoz_url:
             return _link_cell(row.rootcoz_url, "view")
         return {"type": "raw_text", "text": "-"}
     if column is DigestColumn.REVIEWED:
+        if row.rootcoz_missing:
+            return {"type": "raw_text", "text": "-"}
         return {
             "type": "raw_text",
             "text": f"{row.reviewed_count}/{row.failure_count}",
@@ -420,9 +436,7 @@ def build_message(
     if message.format is MessageFormat.BLOCKS:
         # DigestConfig still defaults to DEFAULT_COLUMNS (plain-era list). When
         # callers have not customized columns, keep the classic blocks layout.
-        block_columns = (
-            list(DEFAULT_BLOCK_COLUMNS) if columns == list(DEFAULT_COLUMNS) else columns
-        )
+        block_columns = list(DEFAULT_BLOCK_COLUMNS) if columns == list(DEFAULT_COLUMNS) else columns
         table_blocks = _build_table_blocks(
             shown,
             tiers,
@@ -449,9 +463,7 @@ def build_message(
         return blocks
 
     mrkdwn = message.format is not MessageFormat.PLAIN
-    body = format_rows_text(
-        shown, columns, message, mrkdwn=mrkdwn, tiers=tiers, sort_by=sort_by
-    )
+    body = format_rows_text(shown, columns, message, mrkdwn=mrkdwn, tiers=tiers, sort_by=sort_by)
     parts = [header, totals, body]
     if omitted_text:
         parts.append(omitted_text)
@@ -512,3 +524,48 @@ def payload_fallback_text(payload: list[dict[str, object]] | str) -> str:
     if isinstance(payload, str):
         return payload
     return blocks_to_fallback_text(payload)
+
+
+COMMENT_JENKINS_DOWN = "_⚠️ Jenkins miss-check skipped (Jenkins unreachable)._"
+COMMENT_BOTH_DOWN = "_⚠️ rootcoz and Jenkins unavailable — no digest data._"
+
+
+def comment_rootcoz_down(scopes: list[str] | None = None) -> str:
+    """Slack note when digest rows come from Jenkins only."""
+    label = ", ".join(scopes) if scopes else "gating"
+    return f"_⚠️ rootcoz unavailable — showing Jenkins {label} failures only._"
+
+
+def format_unmapped_teams_text(displays: list[str]) -> str:
+    """Short note when Jenkins teams are not in ``team_map``."""
+    if not displays:
+        return ""
+    uniq = sorted({d for d in displays if d})
+    cleaned = [d.replace("|", "/").replace("<", "").replace(">", "") for d in uniq[:10]]
+    shown = ", ".join(cleaned)
+    extra = f" (+{len(uniq) - 10} more)" if len(uniq) > 10 else ""
+    return f"_⚠️ Unmapped Jenkins team(s): {shown}{extra}. Update jenkins.team_map._"
+
+
+def append_slack_comment(
+    payload: list[dict[str, object]] | str,
+    text: str,
+) -> list[dict[str, object]] | str:
+    """Append a mrkdwn comment/section to a Slack payload."""
+    if not text:
+        return payload
+    if isinstance(payload, list):
+        return [
+            *payload,
+            {"type": "section", "text": {"type": "mrkdwn", "text": text}},
+        ]
+    return f"{payload}\n\n{text}" if payload else text
+
+
+def both_down_payload(*, week_label: str, mention_suffix: str = "") -> list[dict[str, object]]:
+    """Minimal Slack payload when neither rootcoz nor Jenkins is available."""
+    header = f"*rootcoz weekly digest* — {week_label}{mention_suffix}"
+    return [
+        {"type": "section", "text": {"type": "mrkdwn", "text": header}},
+        {"type": "section", "text": {"type": "mrkdwn", "text": COMMENT_BOTH_DOWN}},
+    ]
